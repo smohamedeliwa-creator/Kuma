@@ -2,19 +2,28 @@ const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
 const path = require('path');
+const compression = require('compression');
+const SqliteStore = require('better-sqlite3-session-store')(session);
 const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Gzip compress all responses
+app.use(compression());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use(session({
-  secret: 'kuma-secret-key',
+  store: new SqliteStore({ client: db }),
+  secret: process.env.SESSION_SECRET || 'kuma-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false }
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  },
 }));
 
 // ─── Validation Helpers ───────────────────────────────────────────────────────
@@ -594,7 +603,17 @@ app.get('/api/health', (req, res) => {
 
 // ─── Static Files (after API routes so POST /api/* isn't blocked) ────────────
 const clientDist = path.join(__dirname, 'client', 'dist');
-app.use(express.static(clientDist));
+// Hashed asset filenames (JS/CSS) can be cached for 1 year; index.html must never be cached
+app.use(express.static(clientDist, {
+  maxAge: '1y',
+  etag: true,
+  setHeaders(res, filePath) {
+    // Never cache index.html so the browser always fetches fresh entry point
+    if (filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  },
+}));
 // SPA fallback: serve React index.html for all non-API routes
 app.get('/{*splat}', (_req, res) => {
   res.sendFile(path.join(clientDist, 'index.html'));

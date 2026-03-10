@@ -7,6 +7,17 @@ const db = new Database(path.join(__dirname, 'kuma.db'));
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+// Indexes for frequently queried columns
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_task_assignments_user ON task_assignments(user_id);
+  CREATE INDEX IF NOT EXISTS idx_task_assignments_task ON task_assignments(task_id);
+  CREATE INDEX IF NOT EXISTS idx_tasks_task_list ON tasks(task_list_id);
+  CREATE INDEX IF NOT EXISTS idx_comments_task ON comments(task_id);
+  CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id);
+  CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id);
+  CREATE INDEX IF NOT EXISTS idx_task_exclusions_task_user ON task_exclusions(task_id, user_id);
+`);
+
 // Create tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
