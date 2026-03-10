@@ -551,6 +551,31 @@ app.post('/api/tasks/:id/comments', requireAuth, (req, res) => {
   res.status(201).json(comment);
 });
 
+// ─── Admin Routes ────────────────────────────────────────────────────────────
+
+app.get('/api/admin/users', requireAdmin, (_req, res) => {
+  const users = db.prepare('SELECT id, username, role, created_at FROM users ORDER BY id ASC').all();
+  res.json(users);
+});
+
+app.post('/api/admin/users', requireAdmin, (req, res) => {
+  const { username, password, role } = req.body;
+  const nameErr = validateName(username, 'Username');
+  if (nameErr) return res.status(400).json({ error: nameErr });
+  if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  if (!['admin', 'engineer'].includes(role)) return res.status(400).json({ error: 'Role must be admin or engineer' });
+
+  const existing = db.prepare('SELECT 1 FROM users WHERE username = ?').get(username.trim());
+  if (existing) return res.status(409).json({ error: 'Username already taken' });
+
+  const hash = require('bcrypt').hashSync(password, 10);
+  const result = db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
+    .run(username.trim(), hash, role);
+
+  const user = db.prepare('SELECT id, username, role, created_at FROM users WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json(user);
+});
+
 // ─── Health Route ────────────────────────────────────────────────────────────
 
 app.get('/api/health', (req, res) => {
@@ -568,7 +593,15 @@ app.get('/api/health', (req, res) => {
 });
 
 // ─── Static Files (after API routes so POST /api/* isn't blocked) ────────────
-app.use(express.static(path.join(__dirname, 'public')));
+const clientDist = path.join(__dirname, 'client', 'dist');
+app.use(express.static(clientDist));
+// SPA fallback: serve index.html for all non-API, non-static routes
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  res.sendFile(path.join(clientDist, 'index.html'), (err) => {
+    if (err) next();
+  });
+});
 
 // ─── Global Error Handler ────────────────────────────────────────────────────
 
