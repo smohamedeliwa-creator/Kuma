@@ -9,7 +9,6 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
   secret: 'kuma-secret-key',
@@ -84,24 +83,72 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
 
 // ─── Project Routes ───────────────────────────────────────────────────────────
 
+const PROJECT_STATS_SQL = `
+  SELECT p.*, u.username as created_by_name,
+    COUNT(t.id) as task_count,
+    SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) as done_count,
+    SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_count
+  FROM projects p
+  JOIN users u ON p.created_by = u.id
+  LEFT JOIN task_lists tl ON tl.project_id = p.id
+  LEFT JOIN tasks t ON t.task_list_id = tl.id
+`;
+
 app.get('/api/projects', requireAuth, (req, res) => {
   let projects;
   if (req.session.role === 'admin') {
-    projects = db.prepare(`
-      SELECT p.*, u.username as created_by_name
-      FROM projects p
-      JOIN users u ON p.created_by = u.id
-    `).all();
+    projects = db.prepare(PROJECT_STATS_SQL + ' GROUP BY p.id').all();
   } else {
-    projects = db.prepare(`
-      SELECT p.*, u.username as created_by_name
-      FROM projects p
-      JOIN users u ON p.created_by = u.id
-      JOIN project_members pm ON pm.project_id = p.id
-      WHERE pm.user_id = ?
-    `).all(req.session.userId);
+    projects = db.prepare(
+      PROJECT_STATS_SQL +
+      ' JOIN project_members pm ON pm.project_id = p.id WHERE pm.user_id = ? GROUP BY p.id'
+    ).all(req.session.userId);
   }
   res.json(projects);
+});
+
+app.put('/api/projects/:id', requireAdmin, (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const { name, description } = req.body;
+  const nameErr = validateName(name, 'Project name');
+  if (nameErr) return res.status(400).json({ error: nameErr });
+  if (description && description.length > MAX_DESC_LEN)
+    return res.status(400).json({ error: `Description must be ${MAX_DESC_LEN} characters or fewer` });
+
+  const project = db.prepare('SELECT 1 FROM projects WHERE id = ?').get(projectId);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+
+  db.prepare('UPDATE projects SET name = ?, description = ? WHERE id = ?')
+    .run(name.trim(), description?.trim() || null, projectId);
+
+  const updated = db.prepare(
+    PROJECT_STATS_SQL + ' WHERE p.id = ? GROUP BY p.id'
+  ).get(projectId);
+  res.json(updated);
+});
+
+app.delete('/api/projects/:id', requireAdmin, (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const project = db.prepare('SELECT 1 FROM projects WHERE id = ?').get(projectId);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+
+  db.transaction(() => {
+    const lists = db.prepare('SELECT id FROM task_lists WHERE project_id = ?').all(projectId);
+    for (const list of lists) {
+      const tasks = db.prepare('SELECT id FROM tasks WHERE task_list_id = ?').all(list.id);
+      for (const task of tasks) {
+        db.prepare('DELETE FROM comments WHERE task_id = ?').run(task.id);
+        db.prepare('DELETE FROM task_assignments WHERE task_id = ?').run(task.id);
+        db.prepare('DELETE FROM task_exclusions WHERE task_id = ?').run(task.id);
+      }
+      db.prepare('DELETE FROM tasks WHERE task_list_id = ?').run(list.id);
+    }
+    db.prepare('DELETE FROM task_lists WHERE project_id = ?').run(projectId);
+    db.prepare('DELETE FROM project_members WHERE project_id = ?').run(projectId);
+    db.prepare('DELETE FROM projects WHERE id = ?').run(projectId);
+  })();
+
+  res.json({ message: 'Project deleted' });
 });
 
 app.post('/api/projects', requireAdmin, (req, res) => {
@@ -218,19 +265,33 @@ app.get('/api/task-lists/:id/tasks', requireAuth, (req, res) => {
     if (!member) return res.status(403).json({ error: 'Access denied' });
   }
 
+  const TASK_WITH_ASSIGNEES = `
+    SELECT t.*,
+      GROUP_CONCAT(u.username, ', ') FILTER (WHERE ta.permission = 'edit') as assignee_names
+    FROM tasks t
+    LEFT JOIN task_assignments ta ON ta.task_id = t.id
+    LEFT JOIN users u ON u.id = ta.user_id
+  `;
+
   let tasks;
   if (req.session.role === 'admin') {
-    tasks = db.prepare('SELECT * FROM tasks WHERE task_list_id = ?').all(listId);
+    tasks = db.prepare(
+      TASK_WITH_ASSIGNEES + ' WHERE t.task_list_id = ? GROUP BY t.id'
+    ).all(listId);
   } else {
     // Show tasks where user is assigned AND not excluded
     tasks = db.prepare(`
-      SELECT t.*
+      SELECT t.*,
+        GROUP_CONCAT(u2.username, ', ') FILTER (WHERE ta2.permission = 'edit') as assignee_names
       FROM tasks t
       JOIN task_assignments ta ON ta.task_id = t.id AND ta.user_id = ?
+      LEFT JOIN task_assignments ta2 ON ta2.task_id = t.id
+      LEFT JOIN users u2 ON u2.id = ta2.user_id
       WHERE t.task_list_id = ?
         AND t.id NOT IN (
           SELECT task_id FROM task_exclusions WHERE user_id = ?
         )
+      GROUP BY t.id
     `).all(req.session.userId, listId, req.session.userId);
   }
 
@@ -505,6 +566,9 @@ app.get('/api/health', (req, res) => {
     res.status(500).json({ status: 'error', db: 'disconnected', error: err.message });
   }
 });
+
+// ─── Static Files (after API routes so POST /api/* isn't blocked) ────────────
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Global Error Handler ────────────────────────────────────────────────────
 

@@ -1,13 +1,17 @@
 /* ─── Design Tokens ──────────────────────────────────────────────────────── */
 :root {
-  --bg:           #0f0f0f;
-  --surface:      #1a1a1a;
-  --card:         #242424;
+  /* Light mode (default) */
+  --bg:           #f5f5f5;
+  --surface:      #ffffff;
+  --card:         #f9fafb;
   --accent:       #7c3aed;
   --accent-hover: #6d28d9;
-  --text:         #e5e5e5;
+  --text:         #111827;
   --muted:        #6b7280;
-  --border:       #2e2e2e;
+  --border:       #e5e7eb;
+
+  --spinner-track: rgba(0,0,0,0.12);
+  --spinner-head:  #374151;
 
   --status-todo:        #6b7280;
   --status-in-progress: #d97706;
@@ -24,6 +28,18 @@
   --z-toast:    200;
 }
 
+[data-theme="dark"] {
+  --bg:           #0f0f0f;
+  --surface:      #1a1a1a;
+  --card:         #242424;
+  --text:         #e5e5e5;
+  --muted:        #6b7280;
+  --border:       #2e2e2e;
+
+  --spinner-track: rgba(255,255,255,0.2);
+  --spinner-head:  #ffffff;
+}
+
 /* ─── Reset + Base ───────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
@@ -35,6 +51,7 @@ body {
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
 a { color: inherit; text-decoration: none; }
@@ -195,11 +212,17 @@ textarea { resize: vertical; }
   display: inline-block;
   width: 13px;
   height: 13px;
-  border: 2px solid rgba(255,255,255,0.2);
-  border-top-color: #fff;
+  border: 2px solid var(--spinner-track);
+  border-top-color: var(--spinner-head);
   border-radius: 50%;
   animation: spin 600ms linear infinite;
   vertical-align: middle;
+}
+
+/* Primary button always uses white spinner */
+.btn-primary .spinner {
+  border-color: rgba(255,255,255,0.3);
+  border-top-color: #fff;
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -243,6 +266,13 @@ textarea { resize: vertical; }
 .app-header__user {
   font-size: 13px;
   color: var(--muted);
+}
+
+/* ─── Theme Toggle ───────────────────────────────────────────────────────── */
+.theme-toggle {
+  font-size: 16px;
+  padding: 4px 8px;
+  line-height: 1;
 }
 
 /* ─── Page Layout ────────────────────────────────────────────────────────── */
@@ -333,17 +363,50 @@ textarea { resize: vertical; }
   padding: 20px;
   cursor: pointer;
   transition: border-color var(--transition), transform var(--transition);
+  position: relative;
 }
 .project-card:hover {
   border-color: var(--accent);
   transform: translateY(-1px);
 }
 
+.project-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
 .project-card__name {
   font-weight: 600;
   font-size: 15px;
-  margin-bottom: 6px;
+  flex: 1;
+  min-width: 0;
 }
+
+.project-card__actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--transition);
+  flex-shrink: 0;
+}
+.project-card:hover .project-card__actions { opacity: 1; }
+
+.project-card__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--muted);
+  transition: background var(--transition), color var(--transition);
+}
+.project-card__action-btn:hover { background: var(--bg); color: var(--text); }
+.project-card__action-btn--delete:hover { background: rgba(239,68,68,0.12); color: #ef4444; }
 
 .project-card__desc {
   font-size: 13px;
@@ -357,6 +420,9 @@ textarea { resize: vertical; }
 }
 
 .project-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
   color: var(--muted);
 }
@@ -379,48 +445,63 @@ textarea { resize: vertical; }
   color: var(--muted);
 }
 
-/* ─── Task List + Cards ──────────────────────────────────────────────────── */
+/* ─── Task List Collapse ─────────────────────────────────────────────────── */
+.task-list__collapse-btn {
+  font-size: 10px;
+  color: var(--muted);
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  transition: color var(--transition), background var(--transition);
+}
+.task-list__collapse-btn:hover { color: var(--text); background: var(--border); }
+
+/* ─── Task List + Table ──────────────────────────────────────────────────── */
 .task-section { margin-bottom: 36px; }
 
-.task-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.task-table {
+  width: 100%;
+  border-collapse: collapse;
   margin-top: 4px;
+  font-size: 13px;
 }
 
-.task-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: border-color var(--transition);
-}
-.task-card:hover    { border-color: var(--accent); }
-.task-card--overdue { border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.04); }
-.task-card--due-soon { border-color: rgba(217,119,6,0.4); }
-
-.task-card__name {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.task-card__right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.task-card__due {
-  font-size: 12px;
+.task-table thead th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--muted);
-  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+}
+
+.task-table tbody tr {
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background var(--transition);
+}
+.task-table tbody tr:last-child { border-bottom: none; }
+.task-table tbody tr:hover { background: var(--bg); }
+
+.task-row--overdue { background: rgba(239,68,68,0.04); }
+.task-row--overdue td:first-child { border-left: 3px solid rgba(239,68,68,0.5); }
+.task-row--due-soon td:first-child { border-left: 3px solid rgba(217,119,6,0.4); }
+
+.task-table td {
+  padding: 10px 12px;
+  vertical-align: middle;
+}
+
+.task-table__name { font-weight: 500; }
+.task-table__due  { color: var(--muted); white-space: nowrap; }
+.task-table__assignee { color: var(--muted); }
+.task-table__empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 20px 12px;
+  font-style: italic;
 }
 
 /* ─── Modal ──────────────────────────────────────────────────────────────── */

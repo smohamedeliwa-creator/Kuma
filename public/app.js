@@ -7,6 +7,21 @@ const state = {
   view:           null,
 };
 
+/* ─── Theme ──────────────────────────────────────────────────────────────── */
+function initTheme() {
+  const saved = localStorage.getItem('kuma-theme');
+  document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('kuma-theme', next);
+  const btn = document.querySelector('.theme-toggle');
+  if (btn) btn.textContent = next === 'dark' ? '☀️' : '🌙';
+}
+
 /* ─── DOM Builder (no innerHTML for user content) ────────────────────────── */
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -208,6 +223,14 @@ function navigate(view, params = {}) {
 /* ─── Shared Header ──────────────────────────────────────────────────────── */
 function buildHeader(opts = {}) {
   const rightItems = [];
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  rightItems.push(
+    el('button', {
+      class: 'btn btn-ghost btn-sm theme-toggle',
+      title: isDark ? 'Switch to light mode' : 'Switch to dark mode',
+      onclick: toggleTheme,
+    }, isDark ? '☀️' : '🌙')
+  );
 
   if (isAdmin()) {
     rightItems.push(
@@ -240,7 +263,12 @@ function buildHeader(opts = {}) {
     }, 'Logout')
   );
 
-  const logo = el('div', { class: 'app-header__logo' }, 'Ku', el('span', {}, 'ma'));
+  const logo = el('div', {
+    class: 'app-header__logo',
+    style: 'cursor:pointer',
+    onclick: () => navigate('dashboard'),
+    title: 'Go to dashboard',
+  }, 'Ku', el('span', {}, 'ma'));
   const right = el('div', { class: 'app-header__right' }, ...rightItems);
   return el('header', { class: 'app-header' }, logo, right);
 }
@@ -256,40 +284,125 @@ function openDialog(contentEl) {
 }
 
 /* ─── Sub-renderers ──────────────────────────────────────────────────────── */
-function renderProjectCard(project) {
+function projectStatusBadge(project) {
+  const total = project.task_count || 0;
+  const done  = project.done_count || 0;
+  const inProg = project.in_progress_count || 0;
+  if (total > 0 && done === total) return statusBadge('done');
+  if (inProg > 0)                  return statusBadge('in_progress');
+  return statusBadge('todo');
+}
+
+function renderProjectCard(project, onMutated) {
+  const actions = [];
+  if (isAdmin()) {
+    const editBtn = el('button', {
+      class: 'project-card__action-btn',
+      title: 'Edit project',
+      onclick: e => {
+        e.stopPropagation();
+        const close = openDialog(buildEditProjectForm(project, async updated => {
+          close();
+          Object.assign(project, updated);
+          // Refresh card in place
+          const newCard = renderProjectCard(project, onMutated);
+          card.replaceWith(newCard);
+          if (onMutated) onMutated();
+        }));
+      },
+    }, '✏');
+
+    const delBtn = el('button', {
+      class: 'project-card__action-btn project-card__action-btn--delete',
+      title: 'Delete project',
+      onclick: async e => {
+        e.stopPropagation();
+        if (!confirm(`Delete project "${project.name}"? This cannot be undone.`)) return;
+        try {
+          await api('DELETE', `/api/projects/${project.id}`);
+          showToast('Project deleted');
+          card.remove();
+          if (onMutated) onMutated();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      },
+    }, '🗑');
+
+    actions.push(editBtn, delBtn);
+  }
+
   const card = el('div', { class: 'project-card' },
-    el('div', { class: 'project-card__name truncate' }, project.name),
+    el('div', { class: 'project-card__header' },
+      el('div', { class: 'project-card__name truncate' }, project.name),
+      el('div', { class: 'project-card__actions' }, ...actions)
+    ),
     el('div', { class: 'project-card__desc' }, project.description || 'No description'),
-    el('div', { class: 'project-card__meta' }, 'By ', project.created_by_name)
+    el('div', { class: 'project-card__meta' },
+      el('span', {}, 'By ', project.created_by_name),
+      projectStatusBadge(project)
+    )
   );
   card.addEventListener('click', () => navigate('project', { projectId: project.id }));
   return card;
 }
 
-function renderTaskCard(task) {
-  const overdue  = isOverdue(task);
-  const dueSoon  = isDueSoon(task);
-  const classes  = 'task-card' + (overdue ? ' task-card--overdue' : '') + (dueSoon ? ' task-card--due-soon' : '');
+function renderTaskRow(task) {
+  const overdue = isOverdue(task);
+  const dueSoon = isDueSoon(task);
+  let rowClass = 'task-row';
+  if (overdue)  rowClass += ' task-row--overdue';
+  if (dueSoon)  rowClass += ' task-row--due-soon';
 
-  const rightChildren = [statusBadge(task.status)];
-  if (dueSoon) {
-    rightChildren.push(el('span', { class: 'badge badge--warning' }, '⚠ Due soon'));
-  }
-  if (task.due_date) {
-    rightChildren.push(el('span', { class: 'task-card__due' }, formatDate(task.due_date)));
-  }
+  const dueCells = [];
+  if (task.due_date) dueCells.push(formatDate(task.due_date));
+  if (dueSoon) dueCells.push(el('span', { class: 'badge badge--warning', style: 'margin-left:6px' }, '⚠'));
 
-  const right = el('div', { class: 'task-card__right' }, ...rightChildren);
-  const card  = el('div', { class: classes, 'data-task-id': task.id },
-    el('div', { class: 'task-card__name' }, task.name),
-    right
+  const row = el('tr', { class: rowClass, 'data-task-id': task.id },
+    el('td', { class: 'task-table__name' }, task.name),
+    el('td', { class: 'task-table__due' }, ...dueCells),
+    el('td', { class: 'task-table__status' }, statusBadge(task.status)),
+    el('td', { class: 'task-table__assignee' }, task.assignee_names || '—')
   );
-  card.addEventListener('click', () => renderTaskModal(task.id));
-  return card;
+  row.addEventListener('click', () => renderTaskModal(task.id));
+  return row;
 }
 
+// Session collapse state keyed by list id
+const _collapseState = {};
+
 function renderTaskListSection(list, tasks, projectId) {
-  const taskEls = tasks.map(t => renderTaskCard(t));
+  let collapsed = _collapseState[list.id] ?? false;
+
+  const taskRows = tasks.map(t => renderTaskRow(t));
+  const tbody = el('tbody', {}, ...(taskRows.length > 0
+    ? taskRows
+    : [el('tr', {}, el('td', { colspan: '4', class: 'task-table__empty' }, 'No tasks yet.'))]
+  ));
+
+  const taskList = el('table', { class: 'task-table' },
+    el('thead', {},
+      el('tr', {},
+        el('th', {}, 'Task Name'),
+        el('th', {}, 'Due Date'),
+        el('th', {}, 'Status'),
+        el('th', {}, 'Assigned To')
+      )
+    ),
+    tbody
+  );
+  if (collapsed) taskList.classList.add('hidden');
+
+  const collapseBtn = el('button', {
+    class: 'task-list__collapse-btn',
+    title: 'Collapse/expand',
+    onclick: () => {
+      collapsed = !collapsed;
+      _collapseState[list.id] = collapsed;
+      taskList.classList.toggle('hidden', collapsed);
+      collapseBtn.textContent = collapsed ? '▶' : '▼';
+    },
+  }, collapsed ? '▶' : '▼');
 
   const sectionRight = [];
   if (isAdmin()) {
@@ -308,14 +421,11 @@ function renderTaskListSection(list, tasks, projectId) {
   }
 
   const header = el('div', { class: 'section-header' },
-    el('span', { class: 'section-title' }, list.name),
+    el('div', { class: 'flex gap-sm', style: 'align-items:center' },
+      collapseBtn,
+      el('span', { class: 'section-title' }, list.name)
+    ),
     el('div', { class: 'flex gap-sm' }, ...sectionRight)
-  );
-
-  const taskList = el('div', { class: 'task-list' },
-    ...(taskEls.length > 0
-      ? taskEls
-      : [el('p', { class: 'text-muted text-sm mt-sm' }, 'No tasks yet.')])
   );
 
   return el('div', { class: 'task-section' }, header, taskList);
@@ -440,6 +550,49 @@ function buildCreateProjectForm(onSuccess) {
         description: descInput.value.trim() || null,
       });
       onSuccess();
+    } catch (err) {
+      errMsg.textContent = err.message;
+      setLoading(submitBtn, false);
+    }
+  });
+
+  return form;
+}
+
+function buildEditProjectForm(project, onSuccess) {
+  const nameInput = el('input', { type: 'text', value: project.name, autofocus: true });
+  const descInput = el('textarea', { placeholder: 'Description (optional)', style: 'height:80px' },
+    project.description || ''
+  );
+  const errMsg = el('div', { class: 'error-msg' });
+  const submitBtn = el('button', { type: 'submit', class: 'btn btn-primary' }, 'Save Changes');
+
+  const form = el('form', { class: 'dialog' },
+    el('div', { class: 'dialog__title' }, 'Edit Project'),
+    el('div', { class: 'flex flex-col gap-md' },
+      el('div', { class: 'form-group' },
+        el('label', { class: 'form-label' }, 'Name'),
+        nameInput
+      ),
+      el('div', { class: 'form-group' },
+        el('label', { class: 'form-label' }, 'Description'),
+        descInput
+      ),
+      errMsg
+    ),
+    el('div', { class: 'dialog__footer' }, submitBtn)
+  );
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!nameInput.value.trim()) { errMsg.textContent = 'Name is required.'; return; }
+    setLoading(submitBtn, true, 'Saving...');
+    try {
+      const updated = await api('PUT', `/api/projects/${project.id}`, {
+        name: nameInput.value.trim(),
+        description: descInput.value.trim() || null,
+      });
+      onSuccess(updated);
     } catch (err) {
       errMsg.textContent = err.message;
       setLoading(submitBtn, false);
@@ -783,7 +936,18 @@ async function renderDashboard() {
         )
       );
     } else {
-      projects.forEach(p => grid.appendChild(renderProjectCard(p)));
+      const checkEmpty = () => {
+        if (grid.children.length === 0) {
+          grid.remove();
+          page.appendChild(
+            el('div', { class: 'empty-state' },
+              el('div', { class: 'empty-state__icon' }, '🎚️'),
+              el('div', { class: 'empty-state__text' }, 'No projects yet. Create your first one!')
+            )
+          );
+        }
+      };
+      projects.forEach(p => grid.appendChild(renderProjectCard(p, checkEmpty)));
       page.appendChild(grid);
     }
   } catch (err) {
@@ -1376,6 +1540,7 @@ async function renderAdminPanel() {
 
 /* ─── Boot ───────────────────────────────────────────────────────────────── */
 async function boot() {
+  initTheme();
   try {
     const user = await api('GET', '/api/auth/me');
     state.currentUser = user;
