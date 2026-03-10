@@ -2,23 +2,14 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcrypt');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'kuma.db'));
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'kuma.db');
+const db = new Database(DB_PATH);
 
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-// Indexes for frequently queried columns
-db.exec(`
-  CREATE INDEX IF NOT EXISTS idx_task_assignments_user ON task_assignments(user_id);
-  CREATE INDEX IF NOT EXISTS idx_task_assignments_task ON task_assignments(task_id);
-  CREATE INDEX IF NOT EXISTS idx_tasks_task_list ON tasks(task_list_id);
-  CREATE INDEX IF NOT EXISTS idx_comments_task ON comments(task_id);
-  CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id);
-  CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id);
-  CREATE INDEX IF NOT EXISTS idx_task_exclusions_task_user ON task_exclusions(task_id, user_id);
-`);
+// ─── Step 1: Create all tables ────────────────────────────────────────────────
 
-// Create tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,6 +25,12 @@ db.exec(`
     description TEXT,
     created_by INTEGER NOT NULL REFERENCES users(id),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS project_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id),
+    user_id INTEGER NOT NULL REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS task_lists (
@@ -74,14 +71,31 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE TABLE IF NOT EXISTS project_members (
+  CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id INTEGER NOT NULL REFERENCES projects(id),
-    user_id INTEGER NOT NULL REFERENCES users(id)
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    read INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
-// Seed data (only if users table is empty)
+// ─── Step 2: Create indexes (tables must exist first) ─────────────────────────
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_task_assignments_user ON task_assignments(user_id);
+  CREATE INDEX IF NOT EXISTS idx_task_assignments_task ON task_assignments(task_id);
+  CREATE INDEX IF NOT EXISTS idx_tasks_task_list ON tasks(task_list_id);
+  CREATE INDEX IF NOT EXISTS idx_comments_task ON comments(task_id);
+  CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id);
+  CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id);
+  CREATE INDEX IF NOT EXISTS idx_task_exclusions_task_user ON task_exclusions(task_id, user_id);
+  CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+`);
+
+// ─── Step 3: Seed data (only if users table is empty) ─────────────────────────
+
 const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
 
 if (userCount.count === 0) {
@@ -93,69 +107,55 @@ if (userCount.count === 0) {
   const insertUser = db.prepare(
     'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)'
   );
-
   const insertProject = db.prepare(
     'INSERT INTO projects (name, description, created_by) VALUES (?, ?, ?)'
   );
-
+  const insertMember = db.prepare(
+    'INSERT INTO project_members (project_id, user_id) VALUES (?, ?)'
+  );
   const insertTaskList = db.prepare(
     'INSERT INTO task_lists (project_id, name) VALUES (?, ?)'
   );
-
   const insertTask = db.prepare(
     'INSERT INTO tasks (task_list_id, name, due_date, status, created_by) VALUES (?, ?, ?, ?, ?)'
   );
-
   const insertAssignment = db.prepare(
     'INSERT INTO task_assignments (task_id, user_id, permission) VALUES (?, ?, ?)'
   );
-
   const insertComment = db.prepare(
     'INSERT INTO comments (task_id, user_id, content) VALUES (?, ?, ?)'
   );
 
-  const insertMember = db.prepare(
-    'INSERT INTO project_members (project_id, user_id) VALUES (?, ?)'
-  );
-
   const seed = db.transaction(() => {
-    // Users
     const adminId = insertUser.run('admin', adminHash, 'admin').lastInsertRowid;
     const eng1Id = insertUser.run('eng1', engHash, 'engineer').lastInsertRowid;
     const eng2Id = insertUser.run('eng2', engHash, 'engineer').lastInsertRowid;
     const eng3Id = insertUser.run('eng3', engHash, 'engineer').lastInsertRowid;
 
-    // Project
     const projectId = insertProject.run(
       'Album Mastering 2025',
       'Full album mixing and mastering project for 2025 release',
       adminId
     ).lastInsertRowid;
 
-    // Project members
     insertMember.run(projectId, adminId);
     insertMember.run(projectId, eng1Id);
     insertMember.run(projectId, eng2Id);
     insertMember.run(projectId, eng3Id);
 
-    // Task lists
     const mixingListId = insertTaskList.run(projectId, 'Mixing').lastInsertRowid;
     const masteringListId = insertTaskList.run(projectId, 'Mastering').lastInsertRowid;
 
-    // Tasks
     const task1Id = insertTask.run(
       mixingListId, 'Balance drum levels', '2025-04-01', 'in_progress', eng1Id
     ).lastInsertRowid;
-
     const task2Id = insertTask.run(
       mixingListId, 'Add reverb to vocals', '2025-04-05', 'todo', eng2Id
     ).lastInsertRowid;
-
     const task3Id = insertTask.run(
       masteringListId, 'Final loudness check', '2025-04-15', 'todo', adminId
     ).lastInsertRowid;
 
-    // Assignments
     insertAssignment.run(task1Id, eng1Id, 'edit');
     insertAssignment.run(task1Id, eng2Id, 'view');
     insertAssignment.run(task2Id, eng2Id, 'edit');
@@ -164,7 +164,6 @@ if (userCount.count === 0) {
     insertAssignment.run(task3Id, eng1Id, 'view');
     insertAssignment.run(task3Id, eng3Id, 'view');
 
-    // Comments
     insertComment.run(task1Id, eng1Id, 'Kick drum is a bit too loud, adjusting now.');
     insertComment.run(task1Id, eng2Id, 'Agreed, also check the snare transient.');
     insertComment.run(task2Id, eng2Id, 'Using a plate reverb with 2.5s decay.');
