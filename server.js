@@ -595,12 +595,9 @@ app.get('/api/health', (req, res) => {
 // ─── Static Files (after API routes so POST /api/* isn't blocked) ────────────
 const clientDist = path.join(__dirname, 'client', 'dist');
 app.use(express.static(clientDist));
-// SPA fallback: serve index.html for all non-API, non-static routes
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/')) return next();
-  res.sendFile(path.join(clientDist, 'index.html'), (err) => {
-    if (err) next();
-  });
+// SPA fallback: serve React index.html for all non-API routes
+app.get('/{*splat}', (_req, res) => {
+  res.sendFile(path.join(clientDist, 'index.html'));
 });
 
 // ─── Global Error Handler ────────────────────────────────────────────────────
