@@ -7,7 +7,7 @@ const db = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Trust Railway's HTTPS reverse proxy
+// Trust Railway's HTTPS proxy so req.secure works correctly
 app.set('trust proxy', 1);
 
 app.use(express.json());
@@ -19,7 +19,8 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,   // false = works on both HTTP and HTTPS; Railway HTTPS still sends cookie correctly
+    sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
 }));
