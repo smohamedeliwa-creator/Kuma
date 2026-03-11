@@ -2,38 +2,24 @@ const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
 const path = require('path');
-const compression = require('compression');
-const SqliteStore = require('better-sqlite3-session-store')(session);
 const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const isProd = process.env.NODE_ENV === 'production';
 
-// Trust Railway's HTTPS reverse proxy so secure cookies work correctly
+// Trust Railway's HTTPS reverse proxy
 app.set('trust proxy', 1);
-
-// Gzip compress all responses
-app.use(compression());
-
-// Allow credentials from the frontend (required for session cookies cross-origin)
-app.use((_req, res, next) => {
-  res.header('Access-Control-Allow-Credentials', 'true');
-  next();
-});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use(session({
-  store: new SqliteStore({ client: db }),
   secret: process.env.SESSION_SECRET || 'kuma-secret-key',
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: isProd,       // true on Railway (HTTPS), false on localhost (HTTP)
-    sameSite: isProd ? 'lax' : 'strict',
+    secure: process.env.NODE_ENV === 'production',
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
 }));
