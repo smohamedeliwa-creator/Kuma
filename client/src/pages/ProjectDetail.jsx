@@ -31,12 +31,22 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 
-const STATUS_LABELS = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' };
-const STATUS_VARIANTS = { todo: 'secondary', in_progress: 'info', done: 'success' };
+function StatusBadge({ statusKey, statuses = [] }) {
+  const s = statuses.find(x => x.key === statusKey);
+  if (!s) return <span className="text-xs text-[hsl(var(--muted-foreground))]">{statusKey}</span>;
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium text-white"
+      style={{ backgroundColor: s.color }}
+    >
+      {s.label}
+    </span>
+  );
+}
 
 // ─── Task Detail Sheet ────────────────────────────────────────────────────────
 
-function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, onDeleted }) {
+function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, onDeleted, statuses = [] }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [task, setTask] = useState(null);
@@ -238,14 +248,14 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="todo">To Do</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="done">Done</SelectItem>
+                        {statuses.map(s => (
+                          <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   ) : (
                     <div className="py-2">
-                      <Badge variant={STATUS_VARIANTS[status]}>{STATUS_LABELS[status]}</Badge>
+                      <StatusBadge statusKey={status} statuses={statuses} />
                     </div>
                   )}
                 </div>
@@ -428,7 +438,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
 
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, columns, onClick }) {
+function TaskRow({ task, columns, statuses = [], onClick }) {
   const dueDateStatus = getDueDateStatus(task.due_date);
 
   const cells = {
@@ -443,7 +453,7 @@ function TaskRow({ task, columns, onClick }) {
     ),
     status: (
       <td className="px-3 py-2.5">
-        <Badge variant={STATUS_VARIANTS[task.status]}>{STATUS_LABELS[task.status]}</Badge>
+        <StatusBadge statusKey={task.status} statuses={statuses} />
       </td>
     ),
     assignees: (
@@ -478,7 +488,7 @@ const DEFAULT_COLS = [
   { column_key: 'assignees', label: 'Assigned To', visible: 1 },
 ];
 
-function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS, isAdmin, onDeleted }) {
+function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS, statuses = [], isAdmin, onDeleted }) {
   const { toast } = useToast();
   const [list, setList] = useState(initialList);
   const [tasks, setTasks] = useState([]);
@@ -657,6 +667,7 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
                       key={task.id}
                       task={task}
                       columns={columns}
+                      statuses={statuses}
                       onClick={() => { setSelectedTaskId(task.id); setSheetOpen(true); }}
                     />
                   ))}
@@ -701,9 +712,9 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
+                    {statuses.map(s => (
+                      <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -730,6 +741,7 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
         isAdmin={isAdmin}
         onUpdated={handleTaskUpdated}
         onDeleted={handleTaskDeleted}
+        statuses={statuses}
       />
 
       {/* Delete list confirmation */}
@@ -763,6 +775,7 @@ export function ProjectDetail() {
   const [project, setProject] = useState(null);
   const [taskLists, setTaskLists] = useState([]);
   const [columns, setColumns] = useState(DEFAULT_COLS);
+  const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [createListOpen, setCreateListOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
@@ -773,6 +786,12 @@ export function ProjectDetail() {
   const [colDialogOpen, setColDialogOpen] = useState(false);
   const [editCols, setEditCols] = useState([]);
   const [colSaving, setColSaving] = useState(false);
+
+  // Manage Statuses dialog state
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [newStatusLabel, setNewStatusLabel] = useState('');
+  const [newStatusColor, setNewStatusColor] = useState('#94a3b8');
+  const [statusSaving, setStatusSaving] = useState(false);
 
   // Invite state
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -787,10 +806,12 @@ export function ProjectDetail() {
       api.get(`/api/projects/${id}`),
       api.get(`/api/projects/${id}/task-lists`),
       api.get(`/api/projects/${id}/columns`),
-    ]).then(([projectRes, listsRes, colsRes]) => {
+      api.get(`/api/projects/${id}/statuses`),
+    ]).then(([projectRes, listsRes, colsRes, statusesRes]) => {
       setProject(projectRes.data);
       setTaskLists(listsRes.data);
       setColumns(colsRes.data);
+      setStatuses(statusesRes.data);
     }).catch(() => navigate('/dashboard'))
       .finally(() => setLoading(false));
   }, [id, navigate]);
@@ -806,6 +827,44 @@ export function ProjectDetail() {
       toast({ title: 'Failed to save columns', variant: 'destructive' });
     } finally {
       setColSaving(false);
+    }
+  }
+
+  async function handleAddStatus(e) {
+    e.preventDefault();
+    if (!newStatusLabel.trim()) return;
+    setStatusSaving(true);
+    try {
+      const res = await api.post(`/api/projects/${id}/statuses`, {
+        label: newStatusLabel.trim(),
+        color: newStatusColor,
+      });
+      setStatuses(prev => [...prev, res.data]);
+      setNewStatusLabel('');
+      setNewStatusColor('#94a3b8');
+      toast({ title: 'Status added', variant: 'success' });
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to add status', variant: 'destructive' });
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
+  async function handleUpdateStatus(statusId, label, color) {
+    try {
+      const res = await api.put(`/api/projects/${id}/statuses/${statusId}`, { label, color });
+      setStatuses(prev => prev.map(s => s.id === statusId ? res.data : s));
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to update status', variant: 'destructive' });
+    }
+  }
+
+  async function handleDeleteStatus(statusId) {
+    try {
+      await api.delete(`/api/projects/${id}/statuses/${statusId}`);
+      setStatuses(prev => prev.filter(s => s.id !== statusId));
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to delete status', variant: 'destructive' });
     }
   }
 
@@ -906,6 +965,10 @@ export function ProjectDetail() {
                 <SlidersHorizontal className="h-4 w-4" />
                 Columns
               </Button>
+              <Button size="sm" variant="outline" onClick={() => setStatusDialogOpen(true)}>
+                <SlidersHorizontal className="h-4 w-4" />
+                Statuses
+              </Button>
               <Button size="sm" variant="outline" onClick={() => { setInviteLink(''); setInviteOpen(true); }}>
                 <Mail className="h-4 w-4" />
                 Invite
@@ -937,6 +1000,7 @@ export function ProjectDetail() {
               list={list}
               projectId={parseInt(id)}
               columns={columns}
+              statuses={statuses}
               isAdmin={isAdmin}
               onDeleted={(listId) => setTaskLists(prev => prev.filter(l => l.id !== listId))}
             />
@@ -1010,6 +1074,68 @@ export function ProjectDetail() {
             <Button onClick={handleSaveColumns} disabled={colSaving}>
               {colSaving ? 'Saving…' : 'Save'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Statuses Dialog */}
+      <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manage Statuses</DialogTitle>
+            <DialogDescription>
+              Customize the task statuses for this project. Changes apply to all tasks.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2 max-h-64 overflow-y-auto">
+            {statuses.map(s => (
+              <div key={s.id} className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={s.color}
+                  onChange={e => handleUpdateStatus(s.id, s.label, e.target.value)}
+                  className="h-7 w-7 cursor-pointer rounded border-0 bg-transparent p-0"
+                  title="Pick color"
+                />
+                <Input
+                  value={s.label}
+                  onChange={e => setStatuses(prev => prev.map(x => x.id === s.id ? { ...x, label: e.target.value } : x))}
+                  onBlur={e => handleUpdateStatus(s.id, e.target.value, s.color)}
+                  className="h-8 text-sm flex-1"
+                />
+                <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0">{s.key}</span>
+                <button
+                  onClick={() => handleDeleteStatus(s.id)}
+                  className="rounded p-1 text-[hsl(var(--muted-foreground))] hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/30"
+                  title="Delete status"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <Separator />
+          <form onSubmit={handleAddStatus} className="flex items-center gap-2 pt-1">
+            <input
+              type="color"
+              value={newStatusColor}
+              onChange={e => setNewStatusColor(e.target.value)}
+              className="h-7 w-7 cursor-pointer rounded border-0 bg-transparent p-0 shrink-0"
+              title="Pick color"
+            />
+            <Input
+              value={newStatusLabel}
+              onChange={e => setNewStatusLabel(e.target.value)}
+              placeholder="New status label…"
+              className="h-8 text-sm flex-1"
+            />
+            <Button type="submit" size="sm" disabled={statusSaving || !newStatusLabel.trim()}>
+              <Plus className="h-4 w-4" />
+              Add
+            </Button>
+          </form>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusDialogOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

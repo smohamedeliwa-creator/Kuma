@@ -29,7 +29,6 @@ app.use(session({
 
 // ─── Validation Helpers ───────────────────────────────────────────────────────
 
-const VALID_STATUS = ['todo', 'in_progress', 'done'];
 const VALID_PERMISSION = ['edit', 'view'];
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_NAME_LEN = 200;
@@ -352,14 +351,15 @@ app.post('/api/task-lists/:id/tasks', requireAdmin, (req, res) => {
   const dateErr = validateDate(due_date);
   if (dateErr) return res.status(400).json({ error: dateErr });
 
-  if (!VALID_STATUS.includes(status))
-    return res.status(400).json({ error: `Status must be one of: ${VALID_STATUS.join(', ')}` });
-
   if (!Array.isArray(assignees))
     return res.status(400).json({ error: 'assignees must be an array' });
 
-  const list = db.prepare('SELECT 1 FROM task_lists WHERE id = ?').get(listId);
+  const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(listId);
   if (!list) return res.status(404).json({ error: 'Task list not found' });
+
+  const validStatuses = getStatusKeys(list.project_id);
+  if (!validStatuses.includes(status))
+    return res.status(400).json({ error: `Status must be one of: ${validStatuses.join(', ')}` });
 
   const createTask = db.transaction(() => {
     const result = db.prepare(
@@ -431,8 +431,10 @@ app.put('/api/tasks/:id', requireAuth, (req, res) => {
     updates.due_date = due_date || null;
   }
   if (status !== undefined) {
-    if (!VALID_STATUS.includes(status))
-      return res.status(400).json({ error: `Status must be one of: ${VALID_STATUS.join(', ')}` });
+    const taskList = db.prepare('SELECT project_id FROM task_lists WHERE id = ?').get(task.task_list_id);
+    const validStatuses = taskList ? getStatusKeys(taskList.project_id) : [];
+    if (!validStatuses.includes(status))
+      return res.status(400).json({ error: `Status must be one of: ${validStatuses.join(', ')}` });
     updates.status = status;
   }
 
@@ -445,7 +447,9 @@ app.put('/api/tasks/:id', requireAuth, (req, res) => {
 
   // Notify assignees of status change
   if (updates.status && updates.status !== task.status) {
-    const statusLabel = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' }[updates.status] || updates.status;
+    const taskList2 = db.prepare('SELECT project_id FROM task_lists WHERE id = ?').get(task.task_list_id);
+    const statusRows = taskList2 ? getOrSeedStatuses(taskList2.project_id) : [];
+    const statusLabel = statusRows.find(s => s.key === updates.status)?.label || updates.status;
     const otherAssignees = db.prepare(
       'SELECT user_id FROM task_assignments WHERE task_id = ? AND user_id != ?'
     ).all(taskId, req.session.userId);
@@ -735,6 +739,101 @@ app.put('/api/notifications/:id/read', requireAuth, (req, res) => {
 app.put('/api/notifications/read-all', requireAuth, (req, res) => {
   db.prepare('UPDATE notifications SET read = 1 WHERE user_id = ?').run(req.session.userId);
   res.json({ message: 'All marked as read' });
+});
+
+// ─── Project Statuses Routes ──────────────────────────────────────────────────
+
+const DEFAULT_STATUSES = [
+  { key: 'todo',        label: 'To Do',       color: '#94a3b8', position: 0 },
+  { key: 'in_progress', label: 'In Progress',  color: '#3b82f6', position: 1 },
+  { key: 'done',        label: 'Done',         color: '#22c55e', position: 2 },
+];
+
+function getOrSeedStatuses(projectId) {
+  let rows = db.prepare('SELECT * FROM project_statuses WHERE project_id = ? ORDER BY position ASC').all(projectId);
+  if (rows.length === 0) {
+    const insert = db.prepare('INSERT INTO project_statuses (project_id, key, label, color, position) VALUES (?, ?, ?, ?, ?)');
+    db.transaction(() => {
+      for (const s of DEFAULT_STATUSES) insert.run(projectId, s.key, s.label, s.color, s.position);
+    })();
+    rows = db.prepare('SELECT * FROM project_statuses WHERE project_id = ? ORDER BY position ASC').all(projectId);
+  }
+  return rows;
+}
+
+function getStatusKeys(projectId) {
+  const rows = getOrSeedStatuses(projectId);
+  return rows.map(r => r.key);
+}
+
+app.get('/api/projects/:id/statuses', requireAuth, (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const project = db.prepare('SELECT 1 FROM projects WHERE id = ?').get(projectId);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+
+  if (req.session.role !== 'admin') {
+    const member = db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(projectId, req.session.userId);
+    if (!member) return res.status(403).json({ error: 'Access denied' });
+  }
+  res.json(getOrSeedStatuses(projectId));
+});
+
+app.post('/api/projects/:id/statuses', requireAdmin, (req, res) => {
+  const projectId = parseInt(req.params.id);
+  let { key, label, color } = req.body;
+  if (!label || !label.trim()) return res.status(400).json({ error: 'Label is required' });
+  // Auto-generate key from label if not provided
+  if (!key) key = label.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+  if (!key) return res.status(400).json({ error: 'Invalid key' });
+
+  const project = db.prepare('SELECT 1 FROM projects WHERE id = ?').get(projectId);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+
+  const existing = db.prepare('SELECT 1 FROM project_statuses WHERE project_id = ? AND key = ?').get(projectId, key);
+  if (existing) return res.status(409).json({ error: 'A status with this key already exists' });
+
+  // Ensure defaults seeded first
+  getOrSeedStatuses(projectId);
+  const maxPos = db.prepare('SELECT MAX(position) as m FROM project_statuses WHERE project_id = ?').get(projectId).m || 0;
+  const result = db.prepare('INSERT INTO project_statuses (project_id, key, label, color, position) VALUES (?, ?, ?, ?, ?)')
+    .run(projectId, key, label.trim(), color || '#94a3b8', maxPos + 1);
+  const row = db.prepare('SELECT * FROM project_statuses WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json(row);
+});
+
+app.put('/api/projects/:id/statuses/:statusId', requireAdmin, (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const statusId = parseInt(req.params.statusId);
+  const { label, color } = req.body;
+  if (!label || !label.trim()) return res.status(400).json({ error: 'Label is required' });
+
+  const row = db.prepare('SELECT 1 FROM project_statuses WHERE id = ? AND project_id = ?').get(statusId, projectId);
+  if (!row) return res.status(404).json({ error: 'Status not found' });
+
+  db.prepare('UPDATE project_statuses SET label = ?, color = ? WHERE id = ?').run(label.trim(), color || '#94a3b8', statusId);
+  res.json(db.prepare('SELECT * FROM project_statuses WHERE id = ?').get(statusId));
+});
+
+app.delete('/api/projects/:id/statuses/:statusId', requireAdmin, (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const statusId = parseInt(req.params.statusId);
+
+  const row = db.prepare('SELECT * FROM project_statuses WHERE id = ? AND project_id = ?').get(statusId, projectId);
+  if (!row) return res.status(404).json({ error: 'Status not found' });
+
+  const usageCount = db.prepare(`
+    SELECT COUNT(*) as count FROM tasks t
+    JOIN task_lists tl ON tl.id = t.task_list_id
+    WHERE tl.project_id = ? AND t.status = ?
+  `).get(projectId, row.key).count;
+  if (usageCount > 0) return res.status(409).json({ error: `Cannot delete: ${usageCount} task(s) use this status` });
+
+  // Ensure at least 1 status remains
+  const total = db.prepare('SELECT COUNT(*) as count FROM project_statuses WHERE project_id = ?').get(projectId).count;
+  if (total <= 1) return res.status(400).json({ error: 'A project must have at least one status' });
+
+  db.prepare('DELETE FROM project_statuses WHERE id = ?').run(statusId);
+  res.json({ message: 'Status deleted' });
 });
 
 // ─── Project Columns Routes ───────────────────────────────────────────────────

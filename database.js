@@ -100,6 +100,16 @@ db.exec(`
     position INTEGER NOT NULL DEFAULT 0,
     UNIQUE(project_id, column_key)
   );
+
+  CREATE TABLE IF NOT EXISTS project_statuses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id),
+    key TEXT NOT NULL,
+    label TEXT NOT NULL,
+    color TEXT NOT NULL DEFAULT '#94a3b8',
+    position INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(project_id, key)
+  );
 `);
 
 // ─── Step 2: Create indexes (tables must exist first) ─────────────────────────
@@ -124,6 +134,28 @@ if (!userCols.includes('avatar_color')) db.exec('ALTER TABLE users ADD COLUMN av
 const notifCols = db.pragma('table_info(notifications)').map(c => c.name);
 if (!notifCols.includes('title')) db.exec('ALTER TABLE notifications ADD COLUMN title TEXT');
 if (!notifCols.includes('link')) db.exec('ALTER TABLE notifications ADD COLUMN link TEXT');
+
+// Remove CHECK constraint on tasks.status to allow custom status keys
+const taskTableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get();
+if (taskTableSql && taskTableSql.sql && taskTableSql.sql.includes('CHECK')) {
+  db.pragma('foreign_keys = OFF');
+  db.exec(`
+    CREATE TABLE tasks_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_list_id INTEGER NOT NULL REFERENCES task_lists(id),
+      name TEXT NOT NULL,
+      due_date TEXT,
+      status TEXT NOT NULL DEFAULT 'todo',
+      created_by INTEGER NOT NULL REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    INSERT INTO tasks_new SELECT * FROM tasks;
+    DROP TABLE tasks;
+    ALTER TABLE tasks_new RENAME TO tasks;
+  `);
+  db.pragma('foreign_keys = ON');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_task_list ON tasks(task_list_id)');
+}
 
 // ─── Step 4: Seed data (only if users table is empty) ─────────────────────────
 
