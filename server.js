@@ -406,6 +406,19 @@ app.put('/api/tasks/:id', requireAuth, (req, res) => {
   db.prepare(`UPDATE tasks SET ${setClause} WHERE id = ?`).run(...Object.values(updates), taskId);
 
   const updated = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+
+  // Notify assignees of status change
+  if (updates.status && updates.status !== task.status) {
+    const statusLabel = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' }[updates.status] || updates.status;
+    const otherAssignees = db.prepare(
+      'SELECT user_id FROM task_assignments WHERE task_id = ? AND user_id != ?'
+    ).all(taskId, req.session.userId);
+    for (const { user_id } of otherAssignees) {
+      createNotification(user_id, 'status', 'Task Status Updated',
+        `"${task.name}" was moved to ${statusLabel}`, `/tasks/${taskId}`);
+    }
+  }
+
   res.json(updated);
 });
 
@@ -453,6 +466,16 @@ app.post('/api/tasks/:id/assignments', requireAdmin, (req, res) => {
   if (existing) return res.status(409).json({ error: 'Assignment already exists' });
 
   db.prepare('INSERT INTO task_assignments (task_id, user_id, permission) VALUES (?, ?, ?)').run(taskId, userId, permission);
+
+  // Notify assigned user (if not self)
+  if (userId !== req.session.userId) {
+    const task = db.prepare('SELECT name FROM tasks WHERE id = ?').get(taskId);
+    if (task) {
+      createNotification(userId, 'assignment', 'New Task Assigned',
+        `You were assigned to "${task.name}"`, `/tasks/${taskId}`);
+    }
+  }
+
   res.status(201).json({ message: 'Assignment created' });
 });
 
@@ -556,7 +579,126 @@ app.post('/api/tasks/:id/comments', requireAuth, (req, res) => {
     WHERE c.id = ?
   `).get(result.lastInsertRowid);
 
+  // Notify other assignees of the new comment
+  const commentTask = db.prepare('SELECT name FROM tasks WHERE id = ?').get(taskId);
+  if (commentTask) {
+    const otherAssignees = db.prepare(
+      'SELECT user_id FROM task_assignments WHERE task_id = ? AND user_id != ?'
+    ).all(taskId, req.session.userId);
+    for (const { user_id } of otherAssignees) {
+      createNotification(user_id, 'comment', 'New Comment',
+        `${comment.username} commented on "${commentTask.name}"`, `/tasks/${taskId}`);
+    }
+  }
+
   res.status(201).json(comment);
+});
+
+// ─── Profile Routes ───────────────────────────────────────────────────────────
+
+app.get('/api/profile', requireAuth, (req, res) => {
+  const userId = req.session.userId;
+
+  const user = db.prepare('SELECT id, username, role, full_name, avatar_color, created_at FROM users WHERE id = ?').get(userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // Task counts by status
+  const taskStats = db.prepare(`
+    SELECT t.status, COUNT(*) as count
+    FROM tasks t
+    JOIN task_assignments ta ON ta.task_id = t.id AND ta.user_id = ?
+    WHERE t.id NOT IN (SELECT task_id FROM task_exclusions WHERE user_id = ?)
+    GROUP BY t.status
+  `).all(userId, userId);
+
+  const statusMap = { todo: 0, in_progress: 0, done: 0 };
+  for (const row of taskStats) statusMap[row.status] = row.count;
+
+  // Overdue count (due_date < today, not done)
+  const today = new Date().toISOString().slice(0, 10);
+  const overdueCount = db.prepare(`
+    SELECT COUNT(*) as count
+    FROM tasks t
+    JOIN task_assignments ta ON ta.task_id = t.id AND ta.user_id = ?
+    WHERE t.due_date IS NOT NULL AND t.due_date < ? AND t.status != 'done'
+      AND t.id NOT IN (SELECT task_id FROM task_exclusions WHERE user_id = ?)
+  `).get(userId, today, userId).count;
+
+  // Projects with progress
+  const projects = db.prepare(`
+    SELECT p.id, p.name,
+      COUNT(t.id) as task_count,
+      SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) as done_count
+    FROM projects p
+    JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?
+    LEFT JOIN task_lists tl ON tl.project_id = p.id
+    LEFT JOIN tasks t ON t.task_list_id = tl.id
+    GROUP BY p.id
+  `).all(userId);
+
+  // Recent activity (last 5 comments by this user)
+  const recentActivity = db.prepare(`
+    SELECT c.id, c.content, c.created_at, t.name as task_name, t.id as task_id, p.name as project_name, p.id as project_id
+    FROM comments c
+    JOIN tasks t ON t.id = c.task_id
+    JOIN task_lists tl ON tl.id = t.task_list_id
+    JOIN projects p ON p.id = tl.project_id
+    WHERE c.user_id = ?
+    ORDER BY c.created_at DESC
+    LIMIT 5
+  `).all(userId);
+
+  res.json({
+    user,
+    stats: { ...statusMap, overdue: overdueCount },
+    projects,
+    recentActivity,
+  });
+});
+
+app.put('/api/profile', requireAuth, (req, res) => {
+  const userId = req.session.userId;
+  const { full_name, avatar_color } = req.body;
+
+  if (full_name !== undefined && full_name.length > 100)
+    return res.status(400).json({ error: 'Full name must be 100 characters or fewer' });
+
+  db.prepare('UPDATE users SET full_name = ?, avatar_color = ? WHERE id = ?')
+    .run(full_name?.trim() || null, avatar_color || null, userId);
+
+  const user = db.prepare('SELECT id, username, role, full_name, avatar_color, created_at FROM users WHERE id = ?').get(userId);
+  res.json(user);
+});
+
+// ─── Notification Routes ──────────────────────────────────────────────────────
+
+function createNotification(userId, type, title, message, link = null) {
+  db.prepare('INSERT INTO notifications (user_id, type, title, message, link) VALUES (?, ?, ?, ?, ?)')
+    .run(userId, type, title, message, link);
+}
+
+app.get('/api/notifications', requireAuth, (req, res) => {
+  const notifications = db.prepare(`
+    SELECT * FROM notifications WHERE user_id = ?
+    ORDER BY created_at DESC LIMIT 50
+  `).all(req.session.userId);
+  res.json(notifications);
+});
+
+app.get('/api/notifications/unread-count', requireAuth, (req, res) => {
+  const result = db.prepare('SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0').get(req.session.userId);
+  res.json({ count: result.count });
+});
+
+app.put('/api/notifications/:id/read', requireAuth, (req, res) => {
+  const id = parseInt(req.params.id);
+  db.prepare('UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?').run(id, req.session.userId);
+  res.json({ message: 'Marked as read' });
+});
+
+app.put('/api/notifications/read-all', requireAuth, (req, res) => {
+  db.prepare('UPDATE notifications SET read = 1 WHERE user_id = ?').run(req.session.userId);
+  res.json({ message: 'All marked as read' });
 });
 
 // ─── Admin Routes ────────────────────────────────────────────────────────────

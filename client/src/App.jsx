@@ -8,6 +8,7 @@ const Login = lazy(() => import('@/pages/Login').then((m) => ({ default: m.Login
 const Dashboard = lazy(() => import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard })));
 const ProjectDetail = lazy(() => import('@/pages/ProjectDetail').then((m) => ({ default: m.ProjectDetail })));
 const Admin = lazy(() => import('@/pages/Admin').then((m) => ({ default: m.Admin })));
+const Profile = lazy(() => import('@/pages/Profile').then((m) => ({ default: m.Profile })));
 
 function PageSpinner() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/projects/:id" element={<ProjectDetail />} />
                 <Route path="/admin" element={<Admin />} />
+                <Route path="/profile" element={<Profile />} />
               </Route>
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

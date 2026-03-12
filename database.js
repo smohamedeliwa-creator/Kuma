@@ -94,7 +94,17 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 `);
 
-// ─── Step 3: Seed data (only if users table is empty) ─────────────────────────
+// ─── Step 3: Migrations (add columns if missing) ──────────────────────────────
+
+const userCols = db.pragma('table_info(users)').map(c => c.name);
+if (!userCols.includes('full_name')) db.exec('ALTER TABLE users ADD COLUMN full_name TEXT');
+if (!userCols.includes('avatar_color')) db.exec('ALTER TABLE users ADD COLUMN avatar_color TEXT');
+
+const notifCols = db.pragma('table_info(notifications)').map(c => c.name);
+if (!notifCols.includes('title')) db.exec('ALTER TABLE notifications ADD COLUMN title TEXT');
+if (!notifCols.includes('link')) db.exec('ALTER TABLE notifications ADD COLUMN link TEXT');
+
+// ─── Step 4: Seed data (only if users table is empty) ─────────────────────────
 
 const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
 

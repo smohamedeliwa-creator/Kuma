@@ -1,17 +1,41 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, Sun, Moon, Shield } from 'lucide-react';
+import { LogOut, Sun, Moon, Shield, Bell, CheckCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Avatar, getAvatarColor } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 import logo from '@/assets/logo.png';
+
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+const TYPE_COLORS = {
+  assignment: 'bg-blue-500',
+  comment: 'bg-purple-500',
+  status: 'bg-green-500',
+};
 
 export function Navbar({ darkMode, onToggleDark }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
 
   async function handleLogout() {
     await logout();
     navigate('/login');
   }
+
+  const avatarName = user?.username || '';
+  const avatarColor = getAvatarColor(avatarName);
 
   return (
     <header className="sticky top-0 z-40 border-b bg-[hsl(var(--card))] shadow-sm">
@@ -38,17 +62,81 @@ export function Navbar({ darkMode, onToggleDark }) {
             {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
 
-          {/* User info + logout */}
+          {/* Notifications */}
+          {user && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
+                  <Bell className="h-4 w-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-0">
+                <div className="flex items-center justify-between border-b px-4 py-3">
+                  <h3 className="font-semibold text-sm">Notifications</h3>
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={markAllRead}
+                    >
+                      <CheckCheck className="mr-1 h-3.5 w-3.5" />
+                      Mark all read
+                    </Button>
+                  )}
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
+                      No notifications
+                    </p>
+                  ) : (
+                    notifications.map((n, i) => (
+                      <div key={n.id}>
+                        {i > 0 && <Separator />}
+                        <button
+                          onClick={() => markRead(n.id)}
+                          className={`w-full px-4 py-3 text-left transition-colors hover:bg-[hsl(var(--muted))] ${!n.read ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${TYPE_COLORS[n.type] || 'bg-gray-400'}`} />
+                            <div className="min-w-0 flex-1">
+                              <p className={`text-sm ${!n.read ? 'font-medium' : ''}`}>
+                                {n.title || n.type}
+                              </p>
+                              <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5 line-clamp-2">
+                                {n.message}
+                              </p>
+                              <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                {timeAgo(n.created_at)}
+                              </p>
+                            </div>
+                            {!n.read && (
+                              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#0066CC]" />
+                            )}
+                          </div>
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+
+          {/* Profile Avatar + Logout */}
           {user && (
             <>
-              <span className="hidden text-sm text-[hsl(var(--muted-foreground))] sm:inline px-1">
-                {user.username}
-                {user.role === 'admin' && (
-                  <span className="ml-1.5 rounded-full bg-[#0066CC]/10 px-2 py-0.5 text-xs font-medium text-[#0066CC]">
-                    admin
-                  </span>
-                )}
-              </span>
+              <Button variant="ghost" size="icon" asChild aria-label="Profile">
+                <Link to="/profile">
+                  <Avatar name={avatarName} color={avatarColor} size="sm" />
+                </Link>
+              </Button>
               <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Logout">
                 <LogOut className="h-4 w-4" />
               </Button>
