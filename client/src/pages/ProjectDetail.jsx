@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ChevronDown, ChevronRight, Plus, ArrowLeft, Trash2,
+  ChevronDown, ChevronRight, Plus, ArrowLeft, Trash2, Pencil,
   Send, Calendar, User, MessageSquare, Loader2, Mail, Copy, Check,
   UserPlus, X, SlidersHorizontal,
 } from 'lucide-react';
@@ -478,8 +478,9 @@ const DEFAULT_COLS = [
   { column_key: 'assignees', label: 'Assigned To', visible: 1 },
 ];
 
-function TaskListSection({ list, projectId, columns = DEFAULT_COLS, isAdmin }) {
+function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS, isAdmin, onDeleted }) {
   const { toast } = useToast();
+  const [list, setList] = useState(initialList);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
@@ -489,6 +490,40 @@ function TaskListSection({ list, projectId, columns = DEFAULT_COLS, isAdmin }) {
   const [newTask, setNewTask] = useState({ name: '', due_date: '', status: 'todo' });
   const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
+
+  // Rename
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameSaving, setRenameSaving] = useState(false);
+
+  // Delete
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  async function handleRenameSubmit(e) {
+    e.preventDefault();
+    if (!renameValue.trim() || renameValue.trim() === list.name) { setRenaming(false); return; }
+    setRenameSaving(true);
+    try {
+      const res = await api.put(`/api/task-lists/${list.id}`, { name: renameValue.trim() });
+      setList(res.data);
+      setRenaming(false);
+      toast({ title: 'List renamed', variant: 'success' });
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to rename', variant: 'destructive' });
+    } finally {
+      setRenameSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    try {
+      await api.delete(`/api/task-lists/${list.id}`);
+      onDeleted(list.id);
+      toast({ title: `"${list.name}" deleted`, variant: 'success' });
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to delete', variant: 'destructive' });
+    }
+  }
 
   useEffect(() => {
     api.get(`/api/task-lists/${list.id}/tasks`).then((res) => {
@@ -530,20 +565,59 @@ function TaskListSection({ list, projectId, columns = DEFAULT_COLS, isAdmin }) {
   return (
     <div className="rounded-lg border bg-[hsl(var(--card))] shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[hsl(var(--card))]">
-        <button
-          className="flex items-center gap-2 text-sm font-semibold hover:text-[#0066CC] transition-colors"
-          onClick={() => setCollapsed((c) => !c)}
-        >
-          {collapsed
-            ? <ChevronRight className="h-4 w-4" />
-            : <ChevronDown className="h-4 w-4" />
-          }
-          {list.name}
-          <span className="font-normal text-[hsl(var(--muted-foreground))]">
-            ({tasks.length})
-          </span>
-        </button>
+      <div className="group flex items-center justify-between px-4 py-3 bg-[hsl(var(--card))]">
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            className="flex items-center gap-1.5 text-sm font-semibold hover:text-[#0066CC] transition-colors shrink-0"
+            onClick={() => setCollapsed((c) => !c)}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+
+          {renaming ? (
+            <form onSubmit={handleRenameSubmit} className="flex items-center gap-1.5">
+              <input
+                autoFocus
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                onBlur={handleRenameSubmit}
+                onKeyDown={e => e.key === 'Escape' && setRenaming(false)}
+                disabled={renameSaving}
+                className="h-7 rounded border bg-[hsl(var(--background))] px-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-[#0066CC]/30 min-w-0 w-40"
+              />
+            </form>
+          ) : (
+            <button
+              className="flex items-center gap-2 text-sm font-semibold hover:text-[#0066CC] transition-colors"
+              onClick={() => setCollapsed((c) => !c)}
+            >
+              {list.name}
+              <span className="font-normal text-[hsl(var(--muted-foreground))]">
+                ({tasks.length})
+              </span>
+            </button>
+          )}
+
+          {isAdmin && !renaming && (
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => { setRenameValue(list.name); setRenaming(true); }}
+                className="rounded p-1 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-foreground"
+                title="Rename"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setDeleteOpen(true)}
+                className="rounded p-1 text-[hsl(var(--muted-foreground))] hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/30"
+                title="Delete list"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+
         {isAdmin && !collapsed && (
           <Button size="sm" variant="ghost" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -657,6 +731,22 @@ function TaskListSection({ list, projectId, columns = DEFAULT_COLS, isAdmin }) {
         onUpdated={handleTaskUpdated}
         onDeleted={handleTaskDeleted}
       />
+
+      {/* Delete list confirmation */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{list.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this task list and all {tasks.length} task{tasks.length !== 1 ? 's' : ''} inside it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -842,7 +932,14 @@ export function ProjectDetail() {
           </div>
         ) : (
           taskLists.map((list) => (
-            <TaskListSection key={list.id} list={list} projectId={parseInt(id)} columns={columns} isAdmin={isAdmin} />
+            <TaskListSection
+              key={list.id}
+              list={list}
+              projectId={parseInt(id)}
+              columns={columns}
+              isAdmin={isAdmin}
+              onDeleted={(listId) => setTaskLists(prev => prev.filter(l => l.id !== listId))}
+            />
           ))
         )}
       </div>

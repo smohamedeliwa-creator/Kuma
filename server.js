@@ -262,6 +262,40 @@ app.post('/api/projects/:id/task-lists', requireAdmin, (req, res) => {
   res.status(201).json(list);
 });
 
+app.put('/api/task-lists/:id', requireAdmin, (req, res) => {
+  const listId = parseInt(req.params.id);
+  const { name } = req.body;
+  const nameErr = validateName(name, 'Task list name');
+  if (nameErr) return res.status(400).json({ error: nameErr });
+
+  const list = db.prepare('SELECT 1 FROM task_lists WHERE id = ?').get(listId);
+  if (!list) return res.status(404).json({ error: 'Task list not found' });
+
+  db.prepare('UPDATE task_lists SET name = ? WHERE id = ?').run(name.trim(), listId);
+  const updated = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(listId);
+  res.json(updated);
+});
+
+app.delete('/api/task-lists/:id', requireAdmin, (req, res) => {
+  const listId = parseInt(req.params.id);
+
+  const list = db.prepare('SELECT 1 FROM task_lists WHERE id = ?').get(listId);
+  if (!list) return res.status(404).json({ error: 'Task list not found' });
+
+  db.transaction(() => {
+    const tasks = db.prepare('SELECT id FROM tasks WHERE task_list_id = ?').all(listId);
+    for (const task of tasks) {
+      db.prepare('DELETE FROM comments WHERE task_id = ?').run(task.id);
+      db.prepare('DELETE FROM task_assignments WHERE task_id = ?').run(task.id);
+      db.prepare('DELETE FROM task_exclusions WHERE task_id = ?').run(task.id);
+    }
+    db.prepare('DELETE FROM tasks WHERE task_list_id = ?').run(listId);
+    db.prepare('DELETE FROM task_lists WHERE id = ?').run(listId);
+  })();
+
+  res.json({ message: 'Task list deleted' });
+});
+
 // ─── Task Routes ──────────────────────────────────────────────────────────────
 
 app.get('/api/task-lists/:id/tasks', requireAuth, (req, res) => {
