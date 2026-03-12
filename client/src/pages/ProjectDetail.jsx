@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronDown, ChevronRight, Plus, ArrowLeft, Trash2,
   Send, Calendar, User, MessageSquare, Loader2, Mail, Copy, Check,
+  UserPlus, X,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,13 +29,14 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 
 const STATUS_LABELS = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' };
 const STATUS_VARIANTS = { todo: 'secondary', in_progress: 'info', done: 'success' };
 
 // ─── Task Detail Sheet ────────────────────────────────────────────────────────
 
-function TaskSheet({ taskId, open, onOpenChange, isAdmin, onUpdated, onDeleted }) {
+function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, onDeleted }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [task, setTask] = useState(null);
@@ -47,6 +49,13 @@ function TaskSheet({ taskId, open, onOpenChange, isAdmin, onUpdated, onDeleted }
   const [dueDate, setDueDate] = useState('');
   const [status, setStatus] = useState('todo');
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  // Assignee management
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [addAssigneeOpen, setAddAssigneeOpen] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [newPermission, setNewPermission] = useState('view');
+  const [assigneeBusy, setAssigneeBusy] = useState(false);
 
   useEffect(() => {
     if (!open || !taskId) return;
@@ -64,6 +73,51 @@ function TaskSheet({ taskId, open, onOpenChange, isAdmin, onUpdated, onDeleted }
       setComments(commentsRes.data);
     }).finally(() => setLoading(false));
   }, [open, taskId]);
+
+  useEffect(() => {
+    if (!open || !projectId || !isAdmin) return;
+    api.get(`/api/projects/${projectId}`).then(res => setProjectMembers(res.data.members || []));
+  }, [open, projectId, isAdmin]);
+
+  async function handleAddAssignee(memberId) {
+    setAssigneeBusy(true);
+    try {
+      await api.post(`/api/tasks/${taskId}/assignments`, { userId: memberId, permission: newPermission });
+      const member = projectMembers.find(m => m.id === memberId);
+      setTask(prev => ({
+        ...prev,
+        assignments: [...(prev.assignments || []), { id: memberId, username: member.username, permission: newPermission }],
+      }));
+      setAddAssigneeOpen(false);
+      setMemberSearch('');
+      toast({ title: `${member.username} assigned`, variant: 'success' });
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to assign', variant: 'destructive' });
+    } finally {
+      setAssigneeBusy(false);
+    }
+  }
+
+  async function handleRemoveAssignee(memberId) {
+    try {
+      await api.delete(`/api/tasks/${taskId}/assignments/${memberId}`);
+      setTask(prev => ({ ...prev, assignments: prev.assignments.filter(a => a.id !== memberId) }));
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to remove', variant: 'destructive' });
+    }
+  }
+
+  async function handleChangePermission(memberId, permission) {
+    try {
+      await api.put(`/api/tasks/${taskId}/assignments/${memberId}`, { permission });
+      setTask(prev => ({
+        ...prev,
+        assignments: prev.assignments.map(a => a.id === memberId ? { ...a, permission } : a),
+      }));
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to update permission', variant: 'destructive' });
+    }
+  }
 
   const canEdit = isAdmin || task?.assignments?.some(
     (a) => a.id === user?.id && a.permission === 'edit'
@@ -198,28 +252,96 @@ function TaskSheet({ taskId, open, onOpenChange, isAdmin, onUpdated, onDeleted }
               </div>
 
               {/* Assignees */}
-              {task?.assignments?.length > 0 && (
-                <div className="space-y-2">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
                   <Label>Assignees</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {task.assignments.map((a) => (
-                      <span
-                        key={a.id}
-                        className="flex items-center gap-1.5 rounded-full bg-[hsl(var(--muted))] px-3 py-1 text-xs"
-                      >
-                        <User className="h-3 w-3" />
-                        <span className="font-medium">{a.username}</span>
-                        <Badge
-                          variant={a.permission === 'edit' ? 'default' : 'secondary'}
-                          className="text-[10px] px-1.5 py-0"
-                        >
+                  {isAdmin && (
+                    <Popover open={addAssigneeOpen} onOpenChange={open => { setAddAssigneeOpen(open); if (!open) { setMemberSearch(''); setNewPermission('view'); } }}>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                          <UserPlus className="mr-1 h-3.5 w-3.5" />
+                          Add
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-64 p-3 space-y-2">
+                        <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Add Assignee</p>
+                        <Input
+                          placeholder="Search members…"
+                          value={memberSearch}
+                          onChange={e => setMemberSearch(e.target.value)}
+                          className="h-8 text-sm"
+                          autoFocus
+                        />
+                        <Select value={newPermission} onValueChange={setNewPermission}>
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="edit">Edit</SelectItem>
+                            <SelectItem value="view">View</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="max-h-40 overflow-y-auto space-y-1">
+                          {projectMembers
+                            .filter(m => !task?.assignments?.some(a => a.id === m.id))
+                            .filter(m => m.username.toLowerCase().includes(memberSearch.toLowerCase()))
+                            .map(m => (
+                              <button
+                                key={m.id}
+                                disabled={assigneeBusy}
+                                onClick={() => handleAddAssignee(m.id)}
+                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] disabled:opacity-50"
+                              >
+                                <User className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+                                <span className="flex-1 truncate text-left">{m.username}</span>
+                                {m.role === 'admin' && <span className="text-[10px] text-[#0066CC]">admin</span>}
+                              </button>
+                            ))}
+                          {projectMembers.filter(m => !task?.assignments?.some(a => a.id === m.id)).length === 0 && (
+                            <p className="py-2 text-center text-xs text-[hsl(var(--muted-foreground))]">All members assigned</p>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+
+                {task?.assignments?.length === 0 && (
+                  <p className="text-xs text-[hsl(var(--muted-foreground))]">No assignees yet.</p>
+                )}
+
+                <div className="space-y-1.5">
+                  {task?.assignments?.map((a) => (
+                    <div key={a.id} className="flex items-center gap-2 rounded-md border px-2.5 py-1.5">
+                      <User className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+                      <span className="flex-1 truncate text-sm font-medium">{a.username}</span>
+                      {isAdmin ? (
+                        <>
+                          <Select value={a.permission} onValueChange={perm => handleChangePermission(a.id, perm)}>
+                            <SelectTrigger className="h-6 w-[72px] px-2 text-xs border-0 bg-[hsl(var(--muted))]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="edit">Edit</SelectItem>
+                              <SelectItem value="view">View</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <button
+                            onClick={() => handleRemoveAssignee(a.id)}
+                            className="rounded p-0.5 text-[hsl(var(--muted-foreground))] hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/30"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <Badge variant={a.permission === 'edit' ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
                           {a.permission}
                         </Badge>
-                      </span>
-                    ))}
-                  </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
 
               <Separator />
 
@@ -337,7 +459,7 @@ function TaskRow({ task, onClick }) {
 
 // ─── Task List Section ────────────────────────────────────────────────────────
 
-function TaskListSection({ list, isAdmin }) {
+function TaskListSection({ list, projectId, isAdmin }) {
   const { toast } = useToast();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -504,6 +626,7 @@ function TaskListSection({ list, isAdmin }) {
       {/* Task detail sheet */}
       <TaskSheet
         taskId={selectedTaskId}
+        projectId={projectId}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         isAdmin={isAdmin}
@@ -669,7 +792,7 @@ export function ProjectDetail() {
           </div>
         ) : (
           taskLists.map((list) => (
-            <TaskListSection key={list.id} list={list} isAdmin={isAdmin} />
+            <TaskListSection key={list.id} list={list} projectId={parseInt(id)} isAdmin={isAdmin} />
           ))
         )}
       </div>
