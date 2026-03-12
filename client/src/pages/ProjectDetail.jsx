@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronDown, ChevronRight, Plus, ArrowLeft, Trash2,
   Send, Calendar, User, MessageSquare, Loader2, Mail, Copy, Check,
-  UserPlus, X,
+  UserPlus, X, SlidersHorizontal,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -428,8 +428,30 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
 
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, onClick }) {
+function TaskRow({ task, columns, onClick }) {
   const dueDateStatus = getDueDateStatus(task.due_date);
+
+  const cells = {
+    name: <td className="py-2.5 pl-4 pr-3 text-sm font-medium">{task.name}</td>,
+    due_date: (
+      <td className="px-3 py-2.5 text-sm text-[hsl(var(--muted-foreground))]">
+        <span className="flex items-center gap-1">
+          <Calendar className="h-3.5 w-3.5 shrink-0" />
+          {formatDate(task.due_date)}
+        </span>
+      </td>
+    ),
+    status: (
+      <td className="px-3 py-2.5">
+        <Badge variant={STATUS_VARIANTS[task.status]}>{STATUS_LABELS[task.status]}</Badge>
+      </td>
+    ),
+    assignees: (
+      <td className="px-3 py-2.5 pr-4 text-sm text-[hsl(var(--muted-foreground))]">
+        {task.assignee_names || '—'}
+      </td>
+    ),
+  };
 
   return (
     <tr
@@ -440,26 +462,23 @@ function TaskRow({ task, onClick }) {
       ].join(' ')}
       onClick={onClick}
     >
-      <td className="py-2.5 pl-4 pr-3 text-sm font-medium">{task.name}</td>
-      <td className="px-3 py-2.5 text-sm text-[hsl(var(--muted-foreground))]">
-        <span className="flex items-center gap-1">
-          <Calendar className="h-3.5 w-3.5 shrink-0" />
-          {formatDate(task.due_date)}
-        </span>
-      </td>
-      <td className="px-3 py-2.5">
-        <Badge variant={STATUS_VARIANTS[task.status]}>{STATUS_LABELS[task.status]}</Badge>
-      </td>
-      <td className="px-3 py-2.5 pr-4 text-sm text-[hsl(var(--muted-foreground))]">
-        {task.assignee_names || '—'}
-      </td>
+      {columns.filter(c => c.visible).map(c => (
+        <React.Fragment key={c.column_key}>{cells[c.column_key]}</React.Fragment>
+      ))}
     </tr>
   );
 }
 
 // ─── Task List Section ────────────────────────────────────────────────────────
 
-function TaskListSection({ list, projectId, isAdmin }) {
+const DEFAULT_COLS = [
+  { column_key: 'name', label: 'Task Name', visible: 1 },
+  { column_key: 'due_date', label: 'Due Date', visible: 1 },
+  { column_key: 'status', label: 'Status', visible: 1 },
+  { column_key: 'assignees', label: 'Assigned To', visible: 1 },
+];
+
+function TaskListSection({ list, projectId, columns = DEFAULT_COLS, isAdmin }) {
   const { toast } = useToast();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -548,10 +567,14 @@ function TaskListSection({ list, projectId, isAdmin }) {
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b bg-[hsl(var(--muted))/50] text-xs uppercase text-[hsl(var(--muted-foreground))]">
-                    <th className="py-2 pl-4 pr-3 font-medium">Task Name</th>
-                    <th className="px-3 py-2 font-medium">Due Date</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 pr-4 font-medium">Assigned To</th>
+                    {columns.filter(c => c.visible).map((c, i) => (
+                      <th
+                        key={c.column_key}
+                        className={`py-2 font-medium ${i === 0 ? 'pl-4 pr-3' : i === columns.filter(x => x.visible).length - 1 ? 'px-3 pr-4' : 'px-3'}`}
+                      >
+                        {c.label}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -559,6 +582,7 @@ function TaskListSection({ list, projectId, isAdmin }) {
                     <TaskRow
                       key={task.id}
                       task={task}
+                      columns={columns}
                       onClick={() => { setSelectedTaskId(task.id); setSheetOpen(true); }}
                     />
                   ))}
@@ -648,11 +672,17 @@ export function ProjectDetail() {
 
   const [project, setProject] = useState(null);
   const [taskLists, setTaskLists] = useState([]);
+  const [columns, setColumns] = useState(DEFAULT_COLS);
   const [loading, setLoading] = useState(true);
   const [createListOpen, setCreateListOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [listError, setListError] = useState('');
   const [listCreating, setListCreating] = useState(false);
+
+  // Customize Columns dialog state
+  const [colDialogOpen, setColDialogOpen] = useState(false);
+  const [editCols, setEditCols] = useState([]);
+  const [colSaving, setColSaving] = useState(false);
 
   // Invite state
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -666,12 +696,28 @@ export function ProjectDetail() {
     Promise.all([
       api.get(`/api/projects/${id}`),
       api.get(`/api/projects/${id}/task-lists`),
-    ]).then(([projectRes, listsRes]) => {
+      api.get(`/api/projects/${id}/columns`),
+    ]).then(([projectRes, listsRes, colsRes]) => {
       setProject(projectRes.data);
       setTaskLists(listsRes.data);
+      setColumns(colsRes.data);
     }).catch(() => navigate('/dashboard'))
       .finally(() => setLoading(false));
   }, [id, navigate]);
+
+  async function handleSaveColumns() {
+    setColSaving(true);
+    try {
+      const res = await api.put(`/api/projects/${id}/columns`, { columns: editCols });
+      setColumns(res.data);
+      setColDialogOpen(false);
+      toast({ title: 'Column settings saved', variant: 'success' });
+    } catch {
+      toast({ title: 'Failed to save columns', variant: 'destructive' });
+    } finally {
+      setColSaving(false);
+    }
+  }
 
   async function handleInvite(e) {
     e.preventDefault();
@@ -765,7 +811,11 @@ export function ProjectDetail() {
             )}
           </div>
           {isAdmin && (
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2 shrink-0 flex-wrap">
+              <Button size="sm" variant="outline" onClick={() => { setEditCols(columns.map(c => ({ ...c }))); setColDialogOpen(true); }}>
+                <SlidersHorizontal className="h-4 w-4" />
+                Columns
+              </Button>
               <Button size="sm" variant="outline" onClick={() => { setInviteLink(''); setInviteOpen(true); }}>
                 <Mail className="h-4 w-4" />
                 Invite
@@ -792,7 +842,7 @@ export function ProjectDetail() {
           </div>
         ) : (
           taskLists.map((list) => (
-            <TaskListSection key={list.id} list={list} projectId={parseInt(id)} isAdmin={isAdmin} />
+            <TaskListSection key={list.id} list={list} projectId={parseInt(id)} columns={columns} isAdmin={isAdmin} />
           ))
         )}
       </div>
@@ -824,6 +874,46 @@ export function ProjectDetail() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Customize Columns Dialog */}
+      <Dialog open={colDialogOpen} onOpenChange={setColDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Customize Columns</DialogTitle>
+            <DialogDescription>
+              Rename columns or hide them from the task table. The task name column is always shown.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {editCols.map((col) => (
+              <div key={col.column_key} className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={col.column_key === 'name'}
+                  onClick={() => setEditCols(prev => prev.map(c => c.column_key === col.column_key ? { ...c, visible: c.visible ? 0 : 1 } : c))}
+                  className={`h-5 w-5 shrink-0 rounded border-2 transition-colors flex items-center justify-center
+                    ${col.visible ? 'border-[#0066CC] bg-[#0066CC]' : 'border-[hsl(var(--muted-foreground))] bg-transparent'}
+                    ${col.column_key === 'name' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  {col.visible ? <Check className="h-3 w-3 text-white" /> : null}
+                </button>
+                <Input
+                  value={col.label}
+                  onChange={e => setEditCols(prev => prev.map(c => c.column_key === col.column_key ? { ...c, label: e.target.value } : c))}
+                  className="h-8 text-sm"
+                  placeholder={col.column_key}
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setColDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveColumns} disabled={colSaving}>
+              {colSaving ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

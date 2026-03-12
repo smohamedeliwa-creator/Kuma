@@ -703,6 +703,65 @@ app.put('/api/notifications/read-all', requireAuth, (req, res) => {
   res.json({ message: 'All marked as read' });
 });
 
+// ─── Project Columns Routes ───────────────────────────────────────────────────
+
+const DEFAULT_COLUMNS = [
+  { column_key: 'name',      label: 'Task Name',   visible: 1, position: 0 },
+  { column_key: 'due_date',  label: 'Due Date',    visible: 1, position: 1 },
+  { column_key: 'status',    label: 'Status',      visible: 1, position: 2 },
+  { column_key: 'assignees', label: 'Assigned To', visible: 1, position: 3 },
+];
+
+function getOrSeedColumns(projectId) {
+  let cols = db.prepare('SELECT * FROM project_columns WHERE project_id = ? ORDER BY position ASC').all(projectId);
+  if (cols.length === 0) {
+    const insert = db.prepare('INSERT INTO project_columns (project_id, column_key, label, visible, position) VALUES (?, ?, ?, ?, ?)');
+    db.transaction(() => {
+      for (const c of DEFAULT_COLUMNS) insert.run(projectId, c.column_key, c.label, c.visible, c.position);
+    })();
+    cols = db.prepare('SELECT * FROM project_columns WHERE project_id = ? ORDER BY position ASC').all(projectId);
+  }
+  return cols;
+}
+
+app.get('/api/projects/:id/columns', requireAuth, (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const project = db.prepare('SELECT 1 FROM projects WHERE id = ?').get(projectId);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+
+  if (req.session.role !== 'admin') {
+    const member = db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(projectId, req.session.userId);
+    if (!member) return res.status(403).json({ error: 'Access denied' });
+  }
+
+  res.json(getOrSeedColumns(projectId));
+});
+
+app.put('/api/projects/:id/columns', requireAdmin, (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const { columns } = req.body; // Array of { column_key, label, visible }
+  if (!Array.isArray(columns)) return res.status(400).json({ error: 'columns must be an array' });
+
+  const project = db.prepare('SELECT 1 FROM projects WHERE id = ?').get(projectId);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+
+  // Ensure rows exist first
+  getOrSeedColumns(projectId);
+
+  const update = db.prepare('UPDATE project_columns SET label = ?, visible = ? WHERE project_id = ? AND column_key = ?');
+  db.transaction(() => {
+    for (const col of columns) {
+      if (!col.column_key || typeof col.label !== 'string') continue;
+      const label = col.label.trim() || DEFAULT_COLUMNS.find(d => d.column_key === col.column_key)?.label || col.column_key;
+      // 'name' column is always visible
+      const visible = col.column_key === 'name' ? 1 : (col.visible ? 1 : 0);
+      update.run(label, visible, projectId, col.column_key);
+    }
+  })();
+
+  res.json(getOrSeedColumns(projectId));
+});
+
 // ─── Invitation Routes ────────────────────────────────────────────────────────
 
 function getMailer() {

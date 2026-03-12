@@ -90,6 +90,16 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS project_columns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id),
+    column_key TEXT NOT NULL,
+    label TEXT NOT NULL,
+    visible INTEGER NOT NULL DEFAULT 1,
+    position INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(project_id, column_key)
+  );
 `);
 
 // ─── Step 2: Create indexes (tables must exist first) ─────────────────────────
