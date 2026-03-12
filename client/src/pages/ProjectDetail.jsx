@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronDown, ChevronRight, Plus, ArrowLeft, Trash2,
-  Send, Calendar, User, MessageSquare, Loader2,
+  Send, Calendar, User, MessageSquare, Loader2, Mail, Copy, Check,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,7 +19,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -531,6 +531,14 @@ export function ProjectDetail() {
   const [listError, setListError] = useState('');
   const [listCreating, setListCreating] = useState(false);
 
+  // Invite state
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteError, setInviteError] = useState('');
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteLink, setInviteLink] = useState('');
+  const [linkCopied, setLinkCopied] = useState(false);
+
   useEffect(() => {
     Promise.all([
       api.get(`/api/projects/${id}`),
@@ -541,6 +549,33 @@ export function ProjectDetail() {
     }).catch(() => navigate('/dashboard'))
       .finally(() => setLoading(false));
   }, [id, navigate]);
+
+  async function handleInvite(e) {
+    e.preventDefault();
+    setInviteError('');
+    setInviteLink('');
+    setInviteSending(true);
+    try {
+      const res = await api.post(`/api/projects/${id}/invite`, { email: inviteEmail });
+      setInviteLink(res.data.inviteUrl);
+      if (res.data.emailSent) {
+        toast({ title: 'Invitation sent', description: `Email sent to ${inviteEmail}`, variant: 'success' });
+      } else {
+        toast({ title: 'Invitation created', description: 'Copy the link below to share it manually', variant: 'default' });
+      }
+      setInviteEmail('');
+    } catch (err) {
+      setInviteError(err.response?.data?.error || 'Failed to send invitation');
+    } finally {
+      setInviteSending(false);
+    }
+  }
+
+  async function copyInviteLink() {
+    await navigator.clipboard.writeText(inviteLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }
 
   async function handleCreateList(e) {
     e.preventDefault();
@@ -607,10 +642,16 @@ export function ProjectDetail() {
             )}
           </div>
           {isAdmin && (
-            <Button size="sm" onClick={() => setCreateListOpen(true)} className="shrink-0">
-              <Plus className="h-4 w-4" />
-              New List
-            </Button>
+            <div className="flex gap-2 shrink-0">
+              <Button size="sm" variant="outline" onClick={() => { setInviteLink(''); setInviteOpen(true); }}>
+                <Mail className="h-4 w-4" />
+                Invite
+              </Button>
+              <Button size="sm" onClick={() => setCreateListOpen(true)}>
+                <Plus className="h-4 w-4" />
+                New List
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -659,6 +700,51 @@ export function ProjectDetail() {
                 {listCreating ? 'Creating…' : 'Create List'}
               </Button>
             </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invite Member Dialog */}
+      <Dialog open={inviteOpen} onOpenChange={open => { setInviteOpen(open); if (!open) { setInviteLink(''); setInviteError(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite to {project?.name}</DialogTitle>
+            <DialogDescription>
+              Send an invitation link to a new engineer. They'll create an account and join this project automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleInvite} className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-email">Email Address</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                placeholder="engineer@example.com"
+                required
+              />
+            </div>
+            {inviteError && <p className="text-sm text-red-600">{inviteError}</p>}
+            {inviteLink && (
+              <div className="rounded-md border bg-[hsl(var(--muted))] p-3">
+                <p className="mb-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                  Invite link — share this manually if email isn't configured:
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 truncate text-xs">{inviteLink}</code>
+                  <Button type="button" variant="ghost" size="icon" className="shrink-0 h-7 w-7" onClick={copyInviteLink}>
+                    {linkCopied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>Close</Button>
+              <Button type="submit" disabled={inviteSending}>
+                {inviteSending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending…</> : <><Mail className="mr-2 h-4 w-4" />Send Invite</>}
+              </Button>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

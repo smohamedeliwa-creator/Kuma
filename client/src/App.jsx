@@ -9,6 +9,7 @@ const Dashboard = lazy(() => import('@/pages/Dashboard').then((m) => ({ default:
 const ProjectDetail = lazy(() => import('@/pages/ProjectDetail').then((m) => ({ default: m.ProjectDetail })));
 const Admin = lazy(() => import('@/pages/Admin').then((m) => ({ default: m.Admin })));
 const Profile = lazy(() => import('@/pages/Profile').then((m) => ({ default: m.Profile })));
+const InviteAccept = lazy(() => import('@/pages/InviteAccept').then((m) => ({ default: m.InviteAccept })));
 
 function PageSpinner() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
           <Suspense fallback={<PageSpinner />}>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/invite/:token" element={<InviteAccept />} />
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/projects/:id" element={<ProjectDetail />} />

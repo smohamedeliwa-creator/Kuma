@@ -1,7 +1,9 @@
 const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const path = require('path');
+const nodemailer = require('nodemailer');
 const db = require('./database');
 
 const app = express();
@@ -699,6 +701,156 @@ app.put('/api/notifications/:id/read', requireAuth, (req, res) => {
 app.put('/api/notifications/read-all', requireAuth, (req, res) => {
   db.prepare('UPDATE notifications SET read = 1 WHERE user_id = ?').run(req.session.userId);
   res.json({ message: 'All marked as read' });
+});
+
+// ─── Invitation Routes ────────────────────────────────────────────────────────
+
+function getMailer() {
+  if (!process.env.SMTP_HOST) return null;
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+}
+
+// POST /api/projects/:id/invite — admin sends invite email
+app.post('/api/projects/:id/invite', requireAdmin, async (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const { email } = req.body;
+  if (!email || typeof email !== 'string' || !email.includes('@'))
+    return res.status(400).json({ error: 'Valid email required' });
+
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+
+  // Check email not already a registered user who is already a member
+  const existingUser = db.prepare('SELECT id FROM users WHERE username = ?').get(email.trim().toLowerCase());
+  if (existingUser) {
+    const alreadyMember = db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(projectId, existingUser.id);
+    if (alreadyMember) return res.status(409).json({ error: 'User is already a project member' });
+  }
+
+  // Expire old pending invitations for same email+project
+  db.prepare(`UPDATE invitations SET status = 'expired' WHERE email = ? AND project_id = ? AND status = 'pending'`)
+    .run(email.trim().toLowerCase(), projectId);
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+
+  db.prepare('INSERT INTO invitations (token, email, project_id, invited_by, expires_at) VALUES (?, ?, ?, ?, ?)')
+    .run(token, email.trim().toLowerCase(), projectId, req.session.userId, expiresAt);
+
+  const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+  const inviteUrl = `${appUrl}/invite/${token}`;
+
+  const mailer = getMailer();
+  if (mailer) {
+    try {
+      await mailer.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: email.trim(),
+        subject: `You've been invited to join "${project.name}" on Kuma`,
+        html: `
+          <p>You've been invited to collaborate on <strong>${project.name}</strong> in Kuma.</p>
+          <p><a href="${inviteUrl}" style="background:#0066CC;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;margin:12px 0">Accept Invitation</a></p>
+          <p>This link expires in 7 days. If you weren't expecting this, you can ignore this email.</p>
+          <p style="color:#888;font-size:12px">Or copy this link: ${inviteUrl}</p>
+        `,
+      });
+    } catch (err) {
+      console.error('Email send failed:', err.message);
+      // Still return success — invite link usable manually
+    }
+  }
+
+  res.status(201).json({ message: 'Invitation sent', inviteUrl, emailSent: !!mailer });
+});
+
+// GET /api/invitations/:token — public, validate token
+app.get('/api/invitations/:token', (req, res) => {
+  const inv = db.prepare(`
+    SELECT i.*, p.name as project_name, u.username as invited_by_name
+    FROM invitations i
+    JOIN projects p ON p.id = i.project_id
+    JOIN users u ON u.id = i.invited_by
+    WHERE i.token = ?
+  `).get(req.params.token);
+
+  if (!inv) return res.status(404).json({ error: 'Invitation not found' });
+  if (inv.status === 'accepted') return res.status(410).json({ error: 'This invitation has already been used' });
+  if (inv.status === 'expired' || new Date(inv.expires_at) < new Date())
+    return res.status(410).json({ error: 'This invitation has expired' });
+
+  res.json({
+    email: inv.email,
+    projectName: inv.project_name,
+    invitedBy: inv.invited_by_name,
+    expiresAt: inv.expires_at,
+  });
+});
+
+// POST /api/invitations/:token/accept — register + join project
+app.post('/api/invitations/:token/accept', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || typeof username !== 'string' || !username.trim())
+    return res.status(400).json({ error: 'Username is required' });
+  if (!password || password.length < 6)
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+  const inv = db.prepare('SELECT * FROM invitations WHERE token = ?').get(req.params.token);
+  if (!inv) return res.status(404).json({ error: 'Invitation not found' });
+  if (inv.status !== 'pending' || new Date(inv.expires_at) < new Date())
+    return res.status(410).json({ error: 'Invitation is no longer valid' });
+
+  const existing = db.prepare('SELECT 1 FROM users WHERE username = ?').get(username.trim());
+  if (existing) return res.status(409).json({ error: 'Username already taken' });
+
+  const hash = bcrypt.hashSync(password, 10);
+
+  const accept = db.transaction(() => {
+    const result = db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
+      .run(username.trim(), hash, 'engineer');
+    const userId = result.lastInsertRowid;
+
+    db.prepare('INSERT INTO project_members (project_id, user_id) VALUES (?, ?)').run(inv.project_id, userId);
+    db.prepare(`UPDATE invitations SET status = 'accepted' WHERE id = ?`).run(inv.id);
+
+    // Welcome notification
+    const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(inv.project_id);
+    createNotification(userId, 'assignment', 'Welcome to Kuma!',
+      `You've joined "${project.name}". Get started by checking your tasks.`, `/projects/${inv.project_id}`);
+
+    return db.prepare('SELECT id, username, role FROM users WHERE id = ?').get(userId);
+  });
+
+  const user = accept();
+
+  // Auto-login
+  req.session.userId = user.id;
+  req.session.role = user.role;
+
+  res.status(201).json(user);
+});
+
+// GET /api/projects/:id/invitations — list pending invites for a project (admin)
+app.get('/api/projects/:id/invitations', requireAdmin, (req, res) => {
+  const projectId = parseInt(req.params.id);
+  const invites = db.prepare(`
+    SELECT i.id, i.email, i.status, i.created_at, i.expires_at, u.username as invited_by_name
+    FROM invitations i JOIN users u ON u.id = i.invited_by
+    WHERE i.project_id = ? ORDER BY i.created_at DESC LIMIT 20
+  `).all(projectId);
+  res.json(invites);
+});
+
+// DELETE /api/projects/:id/invitations/:invId — cancel a pending invite (admin)
+app.delete('/api/projects/:id/invitations/:invId', requireAdmin, (req, res) => {
+  const result = db.prepare(`UPDATE invitations SET status = 'expired' WHERE id = ? AND project_id = ? AND status = 'pending'`)
+    .run(parseInt(req.params.invId), parseInt(req.params.id));
+  if (result.changes === 0) return res.status(404).json({ error: 'Invitation not found or already used' });
+  res.json({ message: 'Invitation cancelled' });
 });
 
 // ─── Admin Routes ────────────────────────────────────────────────────────────
