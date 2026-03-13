@@ -216,18 +216,7 @@ export function Dashboard() {
   const loadProjects = useCallback(async () => {
     try {
       const res = await api.get('/api/projects');
-      // Fetch member counts
-      const projects = await Promise.all(
-        res.data.map(async (p) => {
-          try {
-            const detail = await api.get(`/api/projects/${p.id}`);
-            return { ...p, member_count: detail.data.members?.length ?? 0 };
-          } catch {
-            return { ...p, member_count: 0 };
-          }
-        })
-      );
-      setProjects(projects);
+      setProjects(res.data);
     } catch {
       // handled by interceptor
     } finally {

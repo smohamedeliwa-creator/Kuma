@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { Plus, Trash2, UserPlus, Shield } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -37,8 +37,10 @@ function UsersTab() {
   useEffect(() => {
     api.get('/api/admin/users').then((res) => {
       setUsers(res.data);
-    }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+    }).catch(() => {
+      toast({ title: 'Failed to load users', variant: 'destructive' });
+    }).finally(() => setLoading(false));
+  }, [toast]);
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -559,11 +561,9 @@ function AssignmentsTab() {
 
 export function Admin() {
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   if (user && user.role !== 'admin') {
-    navigate('/dashboard');
-    return null;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (

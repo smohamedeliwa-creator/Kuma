@@ -21,11 +21,34 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: false,   // false = works on both HTTP and HTTPS; Railway HTTPS still sends cookie correctly
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
 }));
+
+// ─── Security Headers ─────────────────────────────────────────────────────────
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  next();
+});
+
+// ─── Rate Limiter ─────────────────────────────────────────────────────────────
+
+const loginAttempts = new Map(); // ip -> { count, resetAt }
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || entry.resetAt < now) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + 60 * 1000 });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > 5;
+}
 
 // ─── Validation Helpers ───────────────────────────────────────────────────────
 
@@ -65,6 +88,9 @@ function requireAdmin(req, res, next) {
 // ─── Auth Routes ─────────────────────────────────────────────────────────────
 
 app.post('/api/auth/login', (req, res) => {
+  const ip = req.ip || req.socket.remoteAddress;
+  if (checkRateLimit(ip)) return res.status(429).json({ error: 'Too many login attempts. Please wait a minute.' });
+
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
 
@@ -94,9 +120,10 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
 
 const PROJECT_STATS_SQL = `
   SELECT p.*, u.username as created_by_name,
-    COUNT(t.id) as task_count,
+    COUNT(DISTINCT t.id) as task_count,
     SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) as done_count,
-    SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_count
+    SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_count,
+    (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) as member_count
   FROM projects p
   JOIN users u ON p.created_by = u.id
   LEFT JOIN task_lists tl ON tl.project_id = p.id
@@ -1072,7 +1099,7 @@ app.post('/api/admin/users', requireAdmin, (req, res) => {
 
 // ─── Health Route ────────────────────────────────────────────────────────────
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', requireAuth, (req, res) => {
   try {
     const result = db.prepare('SELECT COUNT(*) as count FROM users').get();
     res.json({

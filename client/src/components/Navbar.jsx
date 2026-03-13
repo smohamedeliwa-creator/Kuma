@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, Sun, Moon, Shield, Bell, CheckCheck } from 'lucide-react';
+import { LogOut, Sun, Moon, Shield, Bell, CheckCheck, UserPlus, MessageSquare, ArrowRightLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,12 @@ const TYPE_COLORS = {
   assignment: 'bg-blue-500',
   comment: 'bg-purple-500',
   status: 'bg-green-500',
+};
+
+const TYPE_ICONS = {
+  assignment: <UserPlus className="h-2.5 w-2.5" />,
+  comment: <MessageSquare className="h-2.5 w-2.5" />,
+  status: <ArrowRightLeft className="h-2.5 w-2.5" />,
 };
 
 export function Navbar({ darkMode, onToggleDark }) {
@@ -104,7 +110,9 @@ export function Navbar({ darkMode, onToggleDark }) {
                           className={`w-full px-4 py-3 text-left transition-colors hover:bg-[hsl(var(--muted))] ${!n.read ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''}`}
                         >
                           <div className="flex items-start gap-3">
-                            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${TYPE_COLORS[n.type] || 'bg-gray-400'}`} />
+                            <span className={`mt-1 h-5 w-5 shrink-0 rounded-full flex items-center justify-center text-white ${TYPE_COLORS[n.type] || 'bg-gray-400'}`}>
+                              {TYPE_ICONS[n.type] || null}
+                            </span>
                             <div className="min-w-0 flex-1">
                               <p className={`text-sm ${!n.read ? 'font-medium' : ''}`}>
                                 {n.title || n.type}

@@ -6,8 +6,30 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import logo from '@/assets/logo.png';
+
+function PasswordStrength({ password }) {
+  if (!password) return null;
+  let strength = 0;
+  if (password.length >= 6) strength++;
+  if (password.length >= 10) strength++;
+  if (/[A-Z]/.test(password) && /[0-9]/.test(password)) strength++;
+  const labels = ['Weak', 'Fair', 'Strong'];
+  const colors = ['bg-red-500', 'bg-yellow-500', 'bg-green-500'];
+  const label = strength > 0 ? labels[strength - 1] : 'Too short';
+  const color = strength > 0 ? colors[strength - 1] : 'bg-red-300';
+  return (
+    <div className="space-y-1 mt-1.5">
+      <div className="flex gap-1">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i < strength ? color : 'bg-[hsl(var(--muted))]'}`} />
+        ))}
+      </div>
+      <p className="text-xs text-[hsl(var(--muted-foreground))]">{label}</p>
+    </div>
+  );
+}
 
 export function InviteAccept() {
   const { token } = useParams();
@@ -130,6 +152,7 @@ export function InviteAccept() {
                     placeholder="Min. 6 characters"
                     required
                   />
+                  <PasswordStrength password={password} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="confirm">Confirm Password</Label>
@@ -144,7 +167,7 @@ export function InviteAccept() {
                 </div>
                 {error && (
                   <Alert variant="destructive">
-                    <p className="text-sm">{error}</p>
+                    <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 )}
                 <Button type="submit" className="w-full" disabled={submitting}>
