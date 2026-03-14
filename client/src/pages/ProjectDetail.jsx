@@ -215,6 +215,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
   const [name, setName] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [status, setStatus] = useState('todo');
+  const [priority, setPriority] = useState('normal');
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Assignee management
@@ -243,6 +244,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
       setName(t.name);
       setDueDate(t.due_date || '');
       setStatus(t.status);
+      setPriority(t.priority || 'normal');
       setComments(commentsRes.data);
       const vals = {};
       for (const v of colValsRes.data) vals[v.column_id] = v.value;
@@ -306,6 +308,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
         name,
         due_date: dueDate || null,
         status,
+        priority,
       });
       setTask((prev) => ({ ...prev, ...res.data }));
       onUpdated(res.data);
@@ -523,6 +526,29 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
                       <StatusBadge statusKey={status} statuses={statuses} />
                     </div>
                   )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Priority</Label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {PRIORITY_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => canEdit && setPriority(opt.value)}
+                      disabled={!canEdit}
+                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border transition-all"
+                      style={{
+                        backgroundColor: priority === opt.value ? opt.color + '22' : 'transparent',
+                        borderColor: priority === opt.value ? opt.color : 'hsl(var(--border))',
+                        color: priority === opt.value ? opt.color : 'hsl(var(--muted-foreground))',
+                      }}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: opt.color }} />
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -1292,6 +1318,86 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
   );
 }
 
+// ─── Priority helpers ─────────────────────────────────────────────────────────
+
+const PRIORITY_OPTIONS = [
+  { value: 'urgent', label: 'Urgent', color: '#EF4444' },
+  { value: 'high',   label: 'High',   color: '#F97316' },
+  { value: 'normal', label: 'Normal', color: '#3B82F6' },
+  { value: 'low',    label: 'Low',    color: '#94A3B8' },
+];
+
+function PriorityDot({ value }) {
+  const opt = PRIORITY_OPTIONS.find(o => o.value === value) || PRIORITY_OPTIONS[2];
+  return <span title={opt.label} className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />;
+}
+
+// ─── Quick Create Dialog ──────────────────────────────────────────────────────
+
+function QuickCreateDialog({ open, onOpenChange, taskLists, onCreated }) {
+  const { toast } = useToast();
+  const [name, setName] = useState('');
+  const [listId, setListId] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open && taskLists.length > 0) setListId(String(taskLists[0].id));
+  }, [open, taskLists]);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!name.trim() || !listId) return;
+    setSaving(true);
+    try {
+      const res = await api.post(`/api/task-lists/${listId}/tasks`, { name: name.trim() });
+      onCreated(Number(listId), res.data);
+      setName('');
+      onOpenChange(false);
+      toast({ title: 'Task created', variant: 'success' });
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to create task', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Quick Create Task</DialogTitle>
+          <DialogDescription>Press Q anywhere to open this dialog.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+          <Input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Task name…"
+            autoFocus
+            required
+          />
+          {taskLists.length > 1 && (
+            <Select value={listId} onValueChange={setListId}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Select list" />
+              </SelectTrigger>
+              <SelectContent>
+                {taskLists.map(l => (
+                  <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={saving || !name.trim()}>{saving ? 'Creating…' : 'Create'}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── ProjectDetail Page ───────────────────────────────────────────────────────
 
 export function ProjectDetail() {
@@ -1324,6 +1430,7 @@ export function ProjectDetail() {
 
   // Share state
   const [shareOpen, setShareOpen] = useState(false);
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
 
   // Invite state
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -1347,6 +1454,19 @@ export function ProjectDetail() {
     }).catch(() => navigate('/dashboard'))
       .finally(() => setLoading(false));
   }, [id, navigate]);
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'q' || e.key === 'Q') {
+        const tag = document.activeElement?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+        e.preventDefault();
+        setQuickCreateOpen(true);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   async function handleSaveColumns() {
     setColSaving(true);
@@ -1465,7 +1585,7 @@ export function ProjectDetail() {
           <ArrowLeft className="h-4 w-4" />
           Back to Projects
         </Button>
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold text-[#1a1a2e] dark:text-white truncate">
               {project?.name}
@@ -1722,6 +1842,17 @@ export function ProjectDetail() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <QuickCreateDialog
+        open={quickCreateOpen}
+        onOpenChange={setQuickCreateOpen}
+        taskLists={taskLists}
+        onCreated={(listId, newTask) => {
+          setTaskLists(prev => prev.map(l =>
+            l.id === listId ? { ...l, tasks: [...l.tasks, newTask] } : l
+          ));
+        }}
+      />
 
       <ShareDialog
         open={shareOpen}

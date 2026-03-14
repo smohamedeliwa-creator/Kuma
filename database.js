@@ -281,6 +281,10 @@ if (taskTableSql && taskTableSql.sql && taskTableSql.sql.includes('CHECK')) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_task_list ON tasks(task_list_id)');
 }
 
+// Add priority column to tasks if missing
+const taskCols = db.pragma('table_info(tasks)').map(c => c.name);
+if (!taskCols.includes('priority')) db.exec("ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'");
+
 // ─── Step 4: Seed data (only if users table is empty) ─────────────────────────
 
 const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();

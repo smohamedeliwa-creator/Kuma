@@ -582,7 +582,7 @@ app.put('/api/tasks/:id/column-values', requireAuth, (req, res) => {
 
 app.put('/api/tasks/:id', requireAuth, (req, res) => {
   const taskId = parseInt(req.params.id);
-  const { name, due_date, status } = req.body;
+  const { name, due_date, status, priority } = req.body;
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
   if (!task) return res.status(404).json({ error: 'Task not found' });
@@ -609,6 +609,12 @@ app.put('/api/tasks/:id', requireAuth, (req, res) => {
     if (!validStatuses.includes(status))
       return res.status(400).json({ error: `Status must be one of: ${validStatuses.join(', ')}` });
     updates.status = status;
+  }
+
+  if (priority !== undefined) {
+    const PRIORITIES = ['urgent', 'high', 'normal', 'low'];
+    if (!PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority' });
+    updates.priority = priority;
   }
 
   if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No fields to update' });
@@ -1483,6 +1489,24 @@ app.post('/api/conversations/:id/members', requireAuth, (req, res) => {
   } catch {
     res.status(409).json({ error: 'User is already a member' });
   }
+});
+
+// ─── My Tasks ─────────────────────────────────────────────────────────────────
+
+app.get('/api/my-tasks', requireAuth, (req, res) => {
+  const tasks = db.prepare(`
+    SELECT t.id, t.name, t.due_date, t.status, t.priority,
+           tl.project_id,
+           p.name AS project_name
+    FROM task_assignments ta
+    JOIN tasks t ON t.id = ta.task_id
+    JOIN task_lists tl ON tl.id = t.task_list_id
+    JOIN projects p ON p.id = tl.project_id
+    WHERE ta.user_id = ?
+    ORDER BY t.due_date ASC NULLS LAST, t.created_at DESC
+    LIMIT 20
+  `).all(req.session.userId);
+  res.json(tasks);
 });
 
 // ─── Share Routes ────────────────────────────────────────────────────────────

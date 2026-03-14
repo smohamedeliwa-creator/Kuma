@@ -30,6 +30,151 @@ function getContrastColor(hex) {
   }
 }
 
+// ─── Person helpers ────────────────────────────────────────────────────────────
+
+const PERSON_COLORS = ['#0066CC','#7C3AED','#059669','#D97706','#DC2626','#0891B2','#8B5CF6','#EC4899'];
+
+function getPersonColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return PERSON_COLORS[Math.abs(hash) % PERSON_COLORS.length];
+}
+
+function PersonTag({ name, onRemove }) {
+  const color = getPersonColor(name);
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full pl-1 pr-1.5 py-0.5 text-xs font-medium text-white"
+      style={{ backgroundColor: color }}>
+      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white/30 text-[9px] font-bold uppercase">
+        {name[0]}
+      </span>
+      {name}
+      {onRemove && (
+        <button type="button" onClick={onRemove} className="ml-0.5 opacity-70 hover:opacity-100">
+          <X className="h-2.5 w-2.5" />
+        </button>
+      )}
+    </span>
+  );
+}
+
+function PersonField({ names, onChange }) {
+  const [input, setInput] = useState('');
+
+  function addName(raw) {
+    const name = raw.trim();
+    if (!name || names.includes(name)) return;
+    const next = [...names, name];
+    onChange(next.length > 0 ? next : null);
+    setInput('');
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addName(input);
+    } else if (e.key === 'Backspace' && !input && names.length > 0) {
+      const next = names.slice(0, -1);
+      onChange(next.length > 0 ? next : null);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1 rounded-md border bg-[hsl(var(--background))] p-1.5 min-h-[36px] focus-within:ring-2 focus-within:ring-[#0066CC]/30">
+      {names.map((name, i) => (
+        <PersonTag key={i} name={name} onRemove={() => {
+          const next = names.filter((_, j) => j !== i);
+          onChange(next.length > 0 ? next : null);
+        }} />
+      ))}
+      <input
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={handleKey}
+        onBlur={() => { if (input.trim()) addName(input); }}
+        placeholder={names.length === 0 ? 'Type name, press Enter…' : ''}
+        className="flex-1 min-w-[120px] bg-transparent text-sm outline-none placeholder:text-[hsl(var(--muted-foreground))]"
+      />
+    </div>
+  );
+}
+
+// ─── Checklist helpers ─────────────────────────────────────────────────────────
+
+function ChecklistField({ items, onChange }) {
+  const [newText, setNewText] = useState('');
+  const done = items.filter(i => i.checked).length;
+
+  function toggleItem(idx) {
+    const next = items.map((it, i) => i === idx ? { ...it, checked: !it.checked } : it);
+    onChange(next);
+  }
+
+  function updateText(idx, text) {
+    const next = items.map((it, i) => i === idx ? { ...it, text } : it);
+    onChange(next);
+  }
+
+  function removeItem(idx) {
+    const next = items.filter((_, i) => i !== idx);
+    onChange(next.length > 0 ? next : null);
+  }
+
+  function addItem() {
+    if (!newText.trim()) return;
+    const next = [...items, { text: newText.trim(), checked: false }];
+    onChange(next);
+    setNewText('');
+  }
+
+  return (
+    <div className="space-y-2">
+      {items.length > 0 && (
+        <p className="text-xs text-[hsl(var(--muted-foreground))]">{done} / {items.length} completed</p>
+      )}
+      <div className="space-y-1.5">
+        {items.map((item, idx) => (
+          <div key={idx} className="flex items-center gap-2 group/item">
+            <button
+              type="button"
+              onClick={() => toggleItem(idx)}
+              className={`h-4 w-4 shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
+                item.checked ? 'bg-[#0066CC] border-[#0066CC]' : 'border-[hsl(var(--muted-foreground))] bg-transparent'
+              }`}
+            >
+              {item.checked && <Check className="h-2.5 w-2.5 text-white" />}
+            </button>
+            <input
+              value={item.text}
+              onChange={e => updateText(idx, e.target.value)}
+              className={`flex-1 bg-transparent text-sm outline-none ${item.checked ? 'line-through text-[hsl(var(--muted-foreground))]' : ''}`}
+            />
+            <button
+              type="button"
+              onClick={() => removeItem(idx)}
+              className="opacity-0 group-hover/item:opacity-100 transition-opacity text-[hsl(var(--muted-foreground))] hover:text-red-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-1.5">
+        <input
+          value={newText}
+          onChange={e => setNewText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } }}
+          placeholder="+ Add item"
+          className="flex-1 bg-transparent text-sm text-[hsl(var(--muted-foreground))] outline-none placeholder:text-[hsl(var(--muted-foreground))]"
+        />
+        {newText.trim() && (
+          <button type="button" onClick={addItem} className="text-[#0066CC] text-sm font-medium">Add</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Type Registry ─────────────────────────────────────────────────────────────
 
 export const COLUMN_TYPES = [
@@ -59,10 +204,21 @@ export function ColumnCellValue({ column, value, members = [] }) {
     return <span className="text-[hsl(var(--muted-foreground))] text-xs">—</span>;
   }
   switch (column.type) {
-    case 'checkbox':
-      return value
-        ? <Check className="h-4 w-4 text-green-500" />
-        : <span className="text-[hsl(var(--muted-foreground))] text-xs">—</span>;
+    case 'checkbox': {
+      // Handle old boolean format
+      const items = Array.isArray(value) ? value : (value === true ? [{text: 'Done', checked: true}] : []);
+      if (items.length === 0) return <span className="text-[hsl(var(--muted-foreground))] text-xs">—</span>;
+      const done = items.filter(i => i.checked).length;
+      const pct = items.length > 0 ? (done / items.length) * 100 : 0;
+      return (
+        <div className="flex items-center gap-1.5 min-w-[60px]">
+          <div className="flex-1 h-1.5 rounded-full bg-[hsl(var(--muted))] overflow-hidden">
+            <div className="h-full rounded-full bg-[#0066CC] transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="text-[10px] text-[hsl(var(--muted-foreground))] whitespace-nowrap">{done}/{items.length}</span>
+        </div>
+      );
+    }
     case 'select':
     case 'status': {
       const opt = column.config?.options?.find(o => o.label === value);
@@ -98,9 +254,16 @@ export function ColumnCellValue({ column, value, members = [] }) {
       );
     }
     case 'person': {
-      const ids = Array.isArray(value) ? value : [];
-      const names = ids.map(id => members.find(m => m.id === id)?.username).filter(Boolean);
-      return <span className="text-sm">{names.join(', ') || '—'}</span>;
+      const names = Array.isArray(value) ? value.filter(n => typeof n === 'string') : [];
+      if (names.length === 0) return <span className="text-[hsl(var(--muted-foreground))] text-xs">—</span>;
+      return (
+        <div className="flex flex-wrap gap-1">
+          {names.slice(0, 3).map((name, i) => (
+            <PersonTag key={i} name={name} />
+          ))}
+          {names.length > 3 && <span className="text-xs text-[hsl(var(--muted-foreground))]">+{names.length - 3}</span>}
+        </div>
+      );
     }
     case 'url':
       return (
@@ -191,19 +354,10 @@ export function ColumnField({ column, value, onChange, members = [], canEdit }) 
           className="h-8 text-sm"
         />
       );
-    case 'checkbox':
-      return (
-        <button
-          type="button"
-          onClick={() => onChange(!value)}
-          aria-label={value ? 'Checked — click to uncheck' : 'Unchecked — click to check'}
-          className={`h-5 w-5 rounded border-2 flex items-center justify-center transition-colors ${
-            value ? 'bg-[#0066CC] border-[#0066CC]' : 'border-[hsl(var(--muted-foreground))] bg-transparent'
-          }`}
-        >
-          {value && <Check className="h-3 w-3 text-white" />}
-        </button>
-      );
+    case 'checkbox': {
+      const items = Array.isArray(value) ? value : (value === true ? [{text: 'Done', checked: true}] : []);
+      return <ChecklistField items={items} onChange={onChange} />;
+    }
     case 'select':
     case 'status': {
       const options = column.config?.options || [];
@@ -259,34 +413,8 @@ export function ColumnField({ column, value, onChange, members = [], canEdit }) 
       );
     }
     case 'person': {
-      const selected = Array.isArray(value) ? value : [];
-      const multiple = column.config?.multiple !== false;
-      if (members.length === 0) return <p className="text-xs text-[hsl(var(--muted-foreground))]">No project members.</p>;
-      return (
-        <div className="flex flex-wrap gap-1.5">
-          {members.map(m => {
-            const isSelected = selected.includes(m.id);
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => {
-                  const next = multiple
-                    ? (isSelected ? selected.filter(id => id !== m.id) : [...selected, m.id])
-                    : (isSelected ? [] : [m.id]);
-                  onChange(next.length > 0 ? next : null);
-                }}
-                className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border transition-all ${
-                  isSelected ? 'bg-[#0066CC] text-white border-[#0066CC]' : 'border-[hsl(var(--border))] hover:border-[#0066CC]'
-                }`}
-              >
-                <User className="h-3 w-3" />
-                {m.username}
-              </button>
-            );
-          })}
-        </div>
-      );
+      const names = Array.isArray(value) ? value.filter(n => typeof n === 'string') : [];
+      return <PersonField names={names} onChange={onChange} />;
     }
     default:
       return <Input value={value ?? ''} onChange={e => onChange(e.target.value || null)} className="h-8 text-sm" />;
