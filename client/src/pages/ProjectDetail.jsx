@@ -933,6 +933,239 @@ function TaskRow({ task, columns, statuses = [], listColumns = [], colValues = {
   );
 }
 
+// ─── Mobile Card View ─────────────────────────────────────────────────────────
+
+// Plain-text summary of a custom column value for card tags
+function ColValueText({ column, value }) {
+  if (value === null || value === undefined || value === '') return null;
+  if (column.type === 'checkbox' && Array.isArray(value)) {
+    const done = value.filter(i => i.checked).length;
+    return `${done}/${value.length}`;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return null;
+    return value.slice(0, 2).join(', ') + (value.length > 2 ? ` +${value.length - 2}` : '');
+  }
+  return String(value);
+}
+
+// Bottom-sheet quick actions on long press
+function QuickActionsMenu({ task, statuses, isAdmin, onClose, onStatusChange, onDelete }) {
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} aria-hidden="true" />
+      <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-[hsl(var(--card))] p-4 pb-8 shadow-xl">
+        <div className="mb-1 flex items-center justify-between">
+          <p className="truncate text-sm font-semibold">{task.name}</p>
+          <button onClick={onClose} className="ml-2 shrink-0 rounded p-1 text-[hsl(var(--muted-foreground))]">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">Change Status</p>
+        <div className="space-y-0.5">
+          {statuses.map(s => (
+            <button
+              key={s.key}
+              onClick={() => { onStatusChange(s.key); onClose(); }}
+              className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-[hsl(var(--muted))] ${task.status === s.key ? 'font-semibold' : ''}`}
+            >
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
+              {s.label}
+              {task.status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[#7C3AED]" />}
+            </button>
+          ))}
+        </div>
+        {isAdmin && (
+          <>
+            <div className="my-3 border-t border-[hsl(var(--border))]" />
+            <button
+              onClick={() => { onDelete(); onClose(); }}
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Task
+            </button>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+function TaskCard({ task, statuses, listColumns, colValues, isAdmin, onOpen, onDelete, onStatusChange }) {
+  const dueDateStatus = getDueDateStatus(task.due_date);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [revealed, setRevealed] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const isHoriz = useRef(false);
+  const longPressTimer = useRef(null);
+
+  // Custom column tags (non-empty values only)
+  const filledCols = listColumns.filter(col => {
+    const v = colValues[col.id];
+    if (v === null || v === undefined || v === '') return false;
+    if (Array.isArray(v) && v.length === 0) return false;
+    return true;
+  });
+  const shownCols = filledCols.slice(0, 3);
+  const moreCols = filledCols.length - shownCols.length;
+
+  function onTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    isHoriz.current = false;
+    longPressTimer.current = setTimeout(() => {
+      if (!revealed) setQuickOpen(true);
+    }, 500);
+  }
+
+  function onTouchMove(e) {
+    clearTimeout(longPressTimer.current);
+    const dx = e.touches[0].clientX - touchStartX.current;
+    const dy = e.touches[0].clientY - touchStartY.current;
+    if (!isHoriz.current && Math.abs(dx) > Math.abs(dy) + 5) {
+      isHoriz.current = true;
+    }
+    if (isHoriz.current && dx < 0) {
+      e.preventDefault();
+      setSwipeOffset(Math.max(dx, -80));
+    }
+  }
+
+  function onTouchEnd() {
+    clearTimeout(longPressTimer.current);
+    if (swipeOffset < -40) {
+      setSwipeOffset(-76);
+      setRevealed(true);
+    } else {
+      setSwipeOffset(0);
+      setRevealed(false);
+    }
+  }
+
+  function handleCardClick() {
+    if (revealed) {
+      setSwipeOffset(0);
+      setRevealed(false);
+      return;
+    }
+    onOpen();
+  }
+
+  const hasFooter = (task.comment_count > 0) || (task.attachment_count > 0);
+
+  return (
+    <div className="relative overflow-hidden rounded-[10px]">
+      {/* Swipe-reveal delete button */}
+      <div className="absolute right-0 top-0 flex h-full w-[76px] items-center justify-center rounded-r-[10px] bg-red-500">
+        <button
+          onClick={onDelete}
+          className="flex flex-col items-center gap-1 text-white"
+          aria-label="Delete task"
+        >
+          <Trash2 className="h-5 w-5" />
+          <span className="text-[10px] font-medium">Delete</span>
+        </button>
+      </div>
+
+      {/* Card */}
+      <div
+        style={{
+          transform: `translateX(${swipeOffset}px)`,
+          transition: (swipeOffset === 0 || swipeOffset === -76) ? 'transform 0.2s ease' : 'none',
+        }}
+        className={[
+          'relative cursor-pointer select-none space-y-2 rounded-[10px] border p-[14px]',
+          'bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08)] dark:bg-[#1A1A1A]',
+          'border-[#E5E5E5] dark:border-[#2E2E2E]',
+          dueDateStatus === 'overdue'  ? 'border-l-[3px] border-l-red-500'    : '',
+          dueDateStatus === 'due-soon' ? 'border-l-[3px] border-l-yellow-500' : '',
+        ].join(' ')}
+        onClick={handleCardClick}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* Top: name + status */}
+        <div className="flex items-start justify-between gap-2">
+          <p className="flex-1 text-[15px] font-semibold leading-snug">{task.name}</p>
+          <StatusBadge statusKey={task.status} statuses={statuses} />
+        </div>
+
+        {/* Middle: due date + assignees */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+          <span className={`flex items-center gap-1 ${dueDateStatus === 'overdue' ? 'text-red-500' : ''}`}>
+            <Calendar className="h-3.5 w-3.5 shrink-0" />
+            {task.due_date ? formatDate(task.due_date) : 'No due date'}
+          </span>
+          {task.assignee_names && (
+            <span className="flex items-center gap-1">
+              <User className="h-3.5 w-3.5 shrink-0" />
+              <span className="max-w-[140px] truncate">{task.assignee_names}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Custom column tags */}
+        {shownCols.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {shownCols.map(col => {
+              const text = ColValueText({ column: col, value: colValues[col.id] });
+              if (!text) return null;
+              return (
+                <span
+                  key={col.id}
+                  className="inline-flex max-w-[160px] items-center gap-1 truncate rounded-full bg-[hsl(var(--muted))] px-2 py-0.5 text-[11px] text-[#6B7280] dark:text-[#9CA3AF]"
+                >
+                  <span className="shrink-0 font-medium">{col.name}:</span>
+                  <span className="truncate">{text}</span>
+                </span>
+              );
+            })}
+            {moreCols > 0 && (
+              <span className="rounded-full bg-[hsl(var(--muted))] px-2 py-0.5 text-[11px] text-[#6B7280]">
+                +{moreCols} more
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Footer: comment + attachment counts */}
+        {hasFooter && (
+          <div className="flex items-center gap-3 border-t border-[#E5E5E5] pt-2 text-xs text-[#9CA3AF] dark:border-[#2E2E2E]">
+            {task.comment_count > 0 && (
+              <span className="flex items-center gap-1">
+                <MessageSquare className="h-3.5 w-3.5" />
+                {task.comment_count}
+              </span>
+            )}
+            {task.attachment_count > 0 && (
+              <span className="flex items-center gap-1">
+                <Paperclip className="h-3.5 w-3.5" />
+                {task.attachment_count}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Long-press quick actions */}
+      {quickOpen && (
+        <QuickActionsMenu
+          task={task}
+          statuses={statuses}
+          isAdmin={isAdmin}
+          onClose={() => setQuickOpen(false)}
+          onStatusChange={onStatusChange}
+          onDelete={onDelete}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Task List Section ────────────────────────────────────────────────────────
 
 const DEFAULT_COLS = [
@@ -1028,6 +1261,25 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
       for (const v of updatedValues) taskVals[v.column_id] = v.value;
       return { ...prev, [taskId]: taskVals };
     });
+  }
+
+  async function handleDeleteTask(taskId) {
+    try {
+      await api.delete(`/api/tasks/${taskId}`);
+      handleTaskDeleted(taskId);
+      toast({ title: 'Task deleted', variant: 'success' });
+    } catch {
+      toast({ title: 'Failed to delete task', variant: 'destructive' });
+    }
+  }
+
+  async function handleStatusChange(taskId, newStatus) {
+    try {
+      const res = await api.put(`/api/tasks/${taskId}`, { status: newStatus });
+      handleTaskUpdated(res.data);
+    } catch {
+      toast({ title: 'Failed to update status', variant: 'destructive' });
+    }
   }
 
   async function handleColumnDrop(draggedId, targetId) {
@@ -1138,74 +1390,110 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
       {!collapsed && (
         <>
           {loading ? (
-            <div className="border-t px-4 py-4 space-y-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
-            </div>
+            <>
+              {/* Mobile skeleton */}
+              <div className="border-t px-4 py-4 space-y-[10px] md:hidden">
+                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-[10px]" />)}
+              </div>
+              {/* Desktop skeleton */}
+              <div className="border-t px-4 py-4 space-y-2 hidden md:block">
+                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+              </div>
+            </>
           ) : tasks.length === 0 ? (
-            <p className="border-t px-4 py-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
-              No tasks yet.
-            </p>
-          ) : (
-            <div className="overflow-x-auto border-t">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b bg-[hsl(var(--muted))/50] text-xs uppercase text-[hsl(var(--muted-foreground))]">
-                    {columns.filter(c => c.visible).map((c, i) => (
-                      <th
-                        key={c.column_key}
-                        className={`py-2 font-medium ${i === 0 ? 'pl-4 pr-3' : 'px-3'}`}
-                      >
-                        {c.label}
-                      </th>
-                    ))}
-                    {listColumns.map(col => (
-                      <th
-                        key={col.id}
-                        className={`px-3 py-2 font-medium cursor-grab select-none transition-colors ${dragOverColId === col.id ? 'bg-[hsl(var(--muted))]' : ''}`}
-                        draggable
-                        onDragStart={() => setDragColId(col.id)}
-                        onDragOver={e => { e.preventDefault(); setDragOverColId(col.id); }}
-                        onDragLeave={() => setDragOverColId(null)}
-                        onDrop={() => handleColumnDrop(dragColId, col.id)}
-                        onDragEnd={() => { setDragColId(null); setDragOverColId(null); }}
-                      >
-                        <div className="flex items-center gap-1 group/col">
-                          <ColumnTypeIcon type={col.type} />
-                          <span>{col.name}</span>
-                          {isAdmin && (
-                            <button
-                              onClick={e => { e.stopPropagation(); setSettingsCol(col); setSettingsOpen(true); }}
-                              className="opacity-0 group-hover/col:opacity-100 transition-opacity ml-0.5 rounded p-0.5 hover:bg-[hsl(var(--background))]"
-                              title="Column settings"
-                            >
-                              <SlidersHorizontal className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
-                      </th>
-                    ))}
-                    {isAdmin && (
-                      <th className="py-1 px-1">
-                        <AddColumnButton listId={list.id} onAdded={col => setListColumns(prev => [...prev, col])} />
-                      </th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {tasks.map((task) => (
-                    <TaskRow
-                      key={task.id}
-                      task={task}
-                      columns={columns}
-                      statuses={statuses}
-                      listColumns={listColumns}
-                      colValues={colValues[task.id] || {}}
-                      onClick={() => { setSelectedTaskId(task.id); setSheetOpen(true); }}
-                    />
-                  ))}
-                </tbody>
-              </table>
+            <div className="border-t px-4 py-8 text-center">
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">No tasks yet.</p>
+              {isAdmin && (
+                <button
+                  onClick={() => setCreateOpen(true)}
+                  className="mt-3 flex items-center gap-1.5 mx-auto rounded-md px-3 py-1.5 text-sm text-[#0066CC] hover:bg-[hsl(var(--muted))] transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Task
+                </button>
+              )}
             </div>
+          ) : (
+            <>
+              {/* ── Mobile card list (hidden on md+) ── */}
+              <div className="border-t px-4 py-3 space-y-[10px] md:hidden">
+                {tasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    statuses={statuses}
+                    listColumns={listColumns}
+                    colValues={colValues[task.id] || {}}
+                    isAdmin={isAdmin}
+                    onOpen={() => { setSelectedTaskId(task.id); setSheetOpen(true); }}
+                    onDelete={() => handleDeleteTask(task.id)}
+                    onStatusChange={(newStatus) => handleStatusChange(task.id, newStatus)}
+                  />
+                ))}
+              </div>
+
+              {/* ── Desktop table (hidden below md) ── */}
+              <div className="hidden md:block overflow-x-auto border-t">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b bg-[hsl(var(--muted))/50] text-xs uppercase text-[hsl(var(--muted-foreground))]">
+                      {columns.filter(c => c.visible).map((c, i) => (
+                        <th
+                          key={c.column_key}
+                          className={`py-2 font-medium ${i === 0 ? 'pl-4 pr-3' : 'px-3'}`}
+                        >
+                          {c.label}
+                        </th>
+                      ))}
+                      {listColumns.map(col => (
+                        <th
+                          key={col.id}
+                          className={`px-3 py-2 font-medium cursor-grab select-none transition-colors ${dragOverColId === col.id ? 'bg-[hsl(var(--muted))]' : ''}`}
+                          draggable
+                          onDragStart={() => setDragColId(col.id)}
+                          onDragOver={e => { e.preventDefault(); setDragOverColId(col.id); }}
+                          onDragLeave={() => setDragOverColId(null)}
+                          onDrop={() => handleColumnDrop(dragColId, col.id)}
+                          onDragEnd={() => { setDragColId(null); setDragOverColId(null); }}
+                        >
+                          <div className="flex items-center gap-1 group/col">
+                            <ColumnTypeIcon type={col.type} />
+                            <span>{col.name}</span>
+                            {isAdmin && (
+                              <button
+                                onClick={e => { e.stopPropagation(); setSettingsCol(col); setSettingsOpen(true); }}
+                                className="opacity-0 group-hover/col:opacity-100 transition-opacity ml-0.5 rounded p-0.5 hover:bg-[hsl(var(--background))]"
+                                title="Column settings"
+                              >
+                                <SlidersHorizontal className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        </th>
+                      ))}
+                      {isAdmin && (
+                        <th className="py-1 px-1">
+                          <AddColumnButton listId={list.id} onAdded={col => setListColumns(prev => [...prev, col])} />
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {tasks.map((task) => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        columns={columns}
+                        statuses={statuses}
+                        listColumns={listColumns}
+                        colValues={colValues[task.id] || {}}
+                        onClick={() => { setSelectedTaskId(task.id); setSheetOpen(true); }}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </>
       )}

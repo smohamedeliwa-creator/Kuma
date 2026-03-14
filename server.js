@@ -443,7 +443,9 @@ app.get('/api/task-lists/:id/tasks', requireAuth, (req, res) => {
 
   const TASK_WITH_ASSIGNEES = `
     SELECT t.*,
-      GROUP_CONCAT(u.username, ', ') FILTER (WHERE ta.permission = 'edit') as assignee_names
+      GROUP_CONCAT(u.username, ', ') FILTER (WHERE ta.permission = 'edit') as assignee_names,
+      (SELECT COUNT(*) FROM comments c WHERE c.task_id = t.id AND c.deleted_at IS NULL AND c.type = 'text') as comment_count,
+      (SELECT COUNT(*) FROM comments c WHERE c.task_id = t.id AND c.deleted_at IS NULL AND c.type IN ('file', 'voice')) as attachment_count
     FROM tasks t
     LEFT JOIN task_assignments ta ON ta.task_id = t.id
     LEFT JOIN users u ON u.id = ta.user_id
@@ -458,7 +460,9 @@ app.get('/api/task-lists/:id/tasks', requireAuth, (req, res) => {
     // Show tasks where user is assigned AND not excluded
     tasks = db.prepare(`
       SELECT t.*,
-        GROUP_CONCAT(u2.username, ', ') FILTER (WHERE ta2.permission = 'edit') as assignee_names
+        GROUP_CONCAT(u2.username, ', ') FILTER (WHERE ta2.permission = 'edit') as assignee_names,
+        (SELECT COUNT(*) FROM comments c WHERE c.task_id = t.id AND c.deleted_at IS NULL AND c.type = 'text') as comment_count,
+        (SELECT COUNT(*) FROM comments c WHERE c.task_id = t.id AND c.deleted_at IS NULL AND c.type IN ('file', 'voice')) as attachment_count
       FROM tasks t
       JOIN task_assignments ta ON ta.task_id = t.id AND ta.user_id = ?
       LEFT JOIN task_assignments ta2 ON ta2.task_id = t.id
