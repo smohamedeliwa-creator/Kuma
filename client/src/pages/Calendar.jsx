@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
   ChevronLeft, ChevronRight, Plus, X, Check, XCircle,
-  Calendar as CalendarIcon, Clock, Users, Briefcase, Edit2, Trash2,
+  Calendar as CalendarIcon, Clock, Users, Edit2, Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -660,7 +660,7 @@ function MobileDayEvents({ date, events, onEventClick }) {
 
 export function Calendar() {
   const { user } = useAuth();
-  const { showToast } = useToast();
+  const { toast } = useToast();
 
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -682,7 +682,7 @@ export function Calendar() {
       const res = await axios.get(`/api/events?year=${viewYear}&month=${viewMonth + 1}`);
       setEvents(res.data.data || []);
     } catch {
-      showToast('Failed to load events', 'error');
+      toast({ title: 'Failed to load events', variant: 'destructive' });
     } finally {
       setLoadingEvents(false);
     }
@@ -717,15 +717,15 @@ export function Calendar() {
       if (editingEvent) {
         const res = await axios.put(`/api/events/${editingEvent.id}`, formData);
         setEvents(evs => evs.map(e => e.id === editingEvent.id ? { ...res.data.data } : e));
-        showToast('Event updated', 'success');
+        toast({ title: 'Event updated' });
       } else {
         const res = await axios.post('/api/events', formData);
         setEvents(evs => [...evs, res.data.data]);
-        showToast('Event created', 'success');
+        toast({ title: 'Event created' });
       }
       setEditingEvent(null);
     } catch {
-      showToast('Failed to save event', 'error');
+      toast({ title: 'Failed to save event', variant: 'destructive' });
       throw new Error('save failed');
     }
   }
@@ -735,9 +735,9 @@ export function Calendar() {
       await axios.delete(`/api/events/${eventId}`);
       setEvents(evs => evs.filter(e => e.id !== eventId));
       setDetailEvent(null);
-      showToast('Event deleted', 'success');
+      toast({ title: 'Event deleted' });
     } catch {
-      showToast('Failed to delete event', 'error');
+      toast({ title: 'Failed to delete event', variant: 'destructive' });
     }
   }
 
@@ -757,9 +757,9 @@ export function Calendar() {
           attendees: ev.attendees.map(a => a.user_id === user?.id ? { ...a, status } : a),
         }));
       }
-      showToast(`You ${status} the event`, 'success');
+      toast({ title: `You ${status} the event` });
     } catch {
-      showToast('Failed to update RSVP', 'error');
+      toast({ title: 'Failed to update RSVP', variant: 'destructive' });
     }
   }
 

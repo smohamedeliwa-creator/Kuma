@@ -4,7 +4,7 @@ import {
   ChevronDown, ChevronRight, Plus, ArrowLeft, Trash2, Pencil,
   Send, Calendar, User, MessageSquare, Loader2, Mail, Copy, Check,
   UserPlus, X, SlidersHorizontal, Mic, Paperclip, Play, Pause,
-  Download, FileText, Image as ImageIcon, Music2, Video, StopCircle, MoreHorizontal,
+  Download, FileText, Image as ImageIcon, Music2, Video, StopCircle, MoreHorizontal, Share2,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,6 +34,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import {
   ColumnTypeIcon, ColumnCellValue, ColumnField, AddColumnButton, ColumnSettingsDialog,
 } from '@/components/CustomColumns';
+import { ShareDialog } from '@/components/ShareDialog';
 
 function getContrastColor(hex) {
   try {
@@ -207,6 +208,9 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
   const [openMenuId, setOpenMenuId] = useState(null);
   const [deleteCommentTarget, setDeleteCommentTarget] = useState(null);
   const [deletingComment, setDeletingComment] = useState(false);
+
+  // Share
+  const [shareTaskOpen, setShareTaskOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -437,8 +441,11 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side="right" className="w-full max-w-[480px] overflow-y-auto">
-          <SheetHeader>
+          <SheetHeader className="flex-row items-center justify-between pr-6">
             <SheetTitle>Task Details</SheetTitle>
+            <Button variant="ghost" size="icon" title="Share task" onClick={() => setShareTaskOpen(true)}>
+              <Share2 className="h-4 w-4" />
+            </Button>
           </SheetHeader>
 
           {loading ? (
@@ -840,6 +847,14 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ShareDialog
+        open={shareTaskOpen}
+        onClose={() => setShareTaskOpen(false)}
+        type="task"
+        referenceId={taskId}
+        isAdmin={isAdmin}
+      />
     </>
   );
 }
@@ -1307,6 +1322,9 @@ export function ProjectDetail() {
   const [newStatusColor, setNewStatusColor] = useState('#94a3b8');
   const [statusSaving, setStatusSaving] = useState(false);
 
+  // Share state
+  const [shareOpen, setShareOpen] = useState(false);
+
   // Invite state
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -1473,26 +1491,32 @@ export function ProjectDetail() {
               </div>
             )}
           </div>
-          {isAdmin && (
-            <div className="flex gap-1.5 shrink-0">
-              <Button size="sm" variant="outline" title="Columns" onClick={() => { setEditCols(columns.map(c => ({ ...c }))); setColDialogOpen(true); }}>
-                <SlidersHorizontal className="h-4 w-4" />
-                <span className="hidden sm:inline">Columns</span>
-              </Button>
-              <Button size="sm" variant="outline" title="Statuses" onClick={() => setStatusDialogOpen(true)}>
-                <SlidersHorizontal className="h-4 w-4" />
-                <span className="hidden sm:inline">Statuses</span>
-              </Button>
-              <Button size="sm" variant="outline" title="Invite" onClick={() => { setInviteLink(''); setInviteOpen(true); }}>
-                <Mail className="h-4 w-4" />
-                <span className="hidden sm:inline">Invite</span>
-              </Button>
-              <Button size="sm" title="New List" onClick={() => setCreateListOpen(true)}>
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">New List</span>
-              </Button>
-            </div>
-          )}
+          <div className="flex gap-1.5 shrink-0">
+            <Button size="sm" variant="outline" title="Share" onClick={() => setShareOpen(true)}>
+              <Share2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Share</span>
+            </Button>
+            {isAdmin && (
+              <>
+                <Button size="sm" variant="outline" title="Columns" onClick={() => { setEditCols(columns.map(c => ({ ...c }))); setColDialogOpen(true); }}>
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="hidden sm:inline">Columns</span>
+                </Button>
+                <Button size="sm" variant="outline" title="Statuses" onClick={() => setStatusDialogOpen(true)}>
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="hidden sm:inline">Statuses</span>
+                </Button>
+                <Button size="sm" variant="outline" title="Invite" onClick={() => { setInviteLink(''); setInviteOpen(true); }}>
+                  <Mail className="h-4 w-4" />
+                  <span className="hidden sm:inline">Invite</span>
+                </Button>
+                <Button size="sm" title="New List" onClick={() => setCreateListOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">New List</span>
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1698,6 +1722,14 @@ export function ProjectDetail() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        type="project"
+        referenceId={parseInt(id)}
+        isAdmin={isAdmin}
+      />
     </>
   );
 }

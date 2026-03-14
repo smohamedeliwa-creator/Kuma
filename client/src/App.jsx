@@ -11,6 +11,7 @@ const Admin = lazy(() => import('@/pages/Admin').then((m) => ({ default: m.Admin
 const Profile = lazy(() => import('@/pages/Profile').then((m) => ({ default: m.Profile })));
 const CalendarPage = lazy(() => import('@/pages/Calendar').then((m) => ({ default: m.Calendar })));
 const InviteAccept = lazy(() => import('@/pages/InviteAccept').then((m) => ({ default: m.InviteAccept })));
+const ShareViewPage = lazy(() => import('@/pages/ShareView').then((m) => ({ default: m.ShareView })));
 
 function PageSpinner() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/invite/:token" element={<InviteAccept />} />
+              <Route path="/share/:token" element={<ShareViewPage />} />
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/projects/:id" element={<ProjectDetail />} />

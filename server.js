@@ -1485,6 +1485,127 @@ app.post('/api/conversations/:id/members', requireAuth, (req, res) => {
   }
 });
 
+// ─── Share Routes ────────────────────────────────────────────────────────────
+
+// GET /api/share/:token — public, no auth required
+app.get('/api/share/:token', (req, res) => {
+  try {
+    const { token } = req.params;
+    const link = db.prepare('SELECT * FROM share_links WHERE token = ?').get(token);
+    if (!link) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Share link not found' } });
+    if (!link.enabled) return res.status(403).json({ error: { code: 'DISABLED', message: 'This link has been disabled' } });
+    if (link.expires_at && new Date(link.expires_at) < new Date()) {
+      return res.status(410).json({ error: { code: 'EXPIRED', message: 'This link has expired' } });
+    }
+
+    if (link.type === 'project') {
+      const project = db.prepare('SELECT id, name, description FROM projects WHERE id = ?').get(link.reference_id);
+      if (!project) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Project not found' } });
+      const members = db.prepare(`
+        SELECT u.id, u.username, u.role FROM project_members pm
+        JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ?
+      `).all(link.reference_id);
+      const taskLists = db.prepare('SELECT id, name FROM task_lists WHERE project_id = ? ORDER BY id ASC').all(link.reference_id);
+      const getTasks = db.prepare(`
+        SELECT t.id, t.name, t.status, t.due_date FROM tasks t WHERE t.task_list_id = ? ORDER BY t.id ASC
+      `);
+      const listsWithTasks = taskLists.map(tl => ({ ...tl, tasks: getTasks.all(tl.id) }));
+      return res.json({ data: { type: 'project', project: { ...project, members }, taskLists: listsWithTasks }, message: 'Success' });
+    }
+
+    if (link.type === 'task') {
+      const task = db.prepare(`
+        SELECT t.id, t.name, t.status, t.due_date,
+          tl.project_id, p.name AS project_name
+        FROM tasks t
+        JOIN task_lists tl ON tl.id = t.task_list_id
+        JOIN projects p ON p.id = tl.project_id
+        WHERE t.id = ?
+      `).get(link.reference_id);
+      if (!task) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Task not found' } });
+      const assignees = db.prepare(`
+        SELECT u.id, u.username, ta.permission FROM task_assignments ta
+        JOIN users u ON u.id = ta.user_id WHERE ta.task_id = ?
+      `).all(link.reference_id);
+      const comments = db.prepare(`
+        SELECT c.id, c.content, c.type, c.file_name, c.created_at,
+          u.username FROM comments c
+        JOIN users u ON u.id = c.user_id
+        WHERE c.task_id = ? AND c.deleted_at IS NULL ORDER BY c.created_at ASC
+      `).all(link.reference_id);
+      return res.json({ data: { type: 'task', task: { ...task, assignees }, comments }, message: 'Success' });
+    }
+
+    return res.status(400).json({ error: { code: 'INVALID_TYPE', message: 'Unknown share type' } });
+  } catch (err) {
+    console.error('[GET /api/share/:token]', err);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to resolve share link' } });
+  }
+});
+
+// POST /api/share — generate or return existing share link
+app.post('/api/share', requireAuth, (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { type, referenceId } = req.body;
+    if (!['project', 'task'].includes(type) || !referenceId) {
+      return res.status(422).json({ error: { code: 'VALIDATION_ERROR', message: 'type and referenceId are required' } });
+    }
+    // Return existing link for this type+reference if any
+    let link = db.prepare('SELECT * FROM share_links WHERE type = ? AND reference_id = ?').get(type, referenceId);
+    if (!link) {
+      const token = crypto.randomBytes(20).toString('hex');
+      db.prepare('INSERT INTO share_links (type, reference_id, token, created_by) VALUES (?, ?, ?, ?)').run(type, referenceId, token, userId);
+      link = db.prepare('SELECT * FROM share_links WHERE token = ?').get(token);
+    }
+    return res.status(201).json({ data: link, message: 'Success' });
+  } catch (err) {
+    console.error('[POST /api/share]', err);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to create share link' } });
+  }
+});
+
+// PUT /api/share/:token — update settings
+app.put('/api/share/:token', requireAuth, (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { token } = req.params;
+    const link = db.prepare('SELECT * FROM share_links WHERE token = ?').get(token);
+    if (!link) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Share link not found' } });
+    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(userId);
+    if (link.created_by !== userId && user.role !== 'admin') {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Not authorized' } });
+    }
+    const { enabled, expires_at } = req.body;
+    if (enabled !== undefined) db.prepare('UPDATE share_links SET enabled = ? WHERE token = ?').run(enabled ? 1 : 0, token);
+    if (expires_at !== undefined) db.prepare('UPDATE share_links SET expires_at = ? WHERE token = ?').run(expires_at, token);
+    const updated = db.prepare('SELECT * FROM share_links WHERE token = ?').get(token);
+    return res.json({ data: updated, message: 'Updated' });
+  } catch (err) {
+    console.error('[PUT /api/share/:token]', err);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to update share link' } });
+  }
+});
+
+// DELETE /api/share/:token — revoke link
+app.delete('/api/share/:token', requireAuth, (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { token } = req.params;
+    const link = db.prepare('SELECT * FROM share_links WHERE token = ?').get(token);
+    if (!link) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Share link not found' } });
+    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(userId);
+    if (link.created_by !== userId && user.role !== 'admin') {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Not authorized' } });
+    }
+    db.prepare('DELETE FROM share_links WHERE token = ?').run(token);
+    return res.json({ data: {}, message: 'Revoked' });
+  } catch (err) {
+    console.error('[DELETE /api/share/:token]', err);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to revoke share link' } });
+  }
+});
+
 // ─── Calendar Routes ─────────────────────────────────────────────────────────
 
 app.get('/api/events', requireAuth, (req, res) => {

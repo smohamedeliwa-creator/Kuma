@@ -239,6 +239,26 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_event_attendees_user ON event_attendees(user_id);
 `);
 
+// ─── Share Links Table ────────────────────────────────────────────────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS share_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL CHECK(type IN ('project', 'task')),
+    reference_id INTEGER NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    expires_at DATETIME,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_share_links_token ON share_links(token);
+  CREATE INDEX IF NOT EXISTS idx_share_links_ref ON share_links(type, reference_id);
+`);
+
 // Remove CHECK constraint on tasks.status to allow custom status keys
 const taskTableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get();
 if (taskTableSql && taskTableSql.sql && taskTableSql.sql.includes('CHECK')) {
