@@ -1485,6 +1485,234 @@ app.post('/api/conversations/:id/members', requireAuth, (req, res) => {
   }
 });
 
+// ─── Calendar Routes ─────────────────────────────────────────────────────────
+
+app.get('/api/events', requireAuth, (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { year, month } = req.query;
+    if (!year || !month) {
+      return res.status(422).json({ error: { code: 'MISSING_PARAMS', message: 'year and month are required' } });
+    }
+    const y = parseInt(year, 10);
+    const m = parseInt(month, 10);
+    if (isNaN(y) || isNaN(m) || m < 1 || m > 12) {
+      return res.status(422).json({ error: { code: 'INVALID_PARAMS', message: 'Invalid year or month' } });
+    }
+    const pad = (n) => String(n).padStart(2, '0');
+    const startOfMonth = `${y}-${pad(m)}-01`;
+    const lastDay = new Date(y, m, 0).getDate();
+    const endOfMonth = `${y}-${pad(m)}-${pad(lastDay)}`;
+
+    const events = db.prepare(`
+      SELECT DISTINCT e.*, u.username AS creator_name, u.full_name AS creator_full_name
+      FROM events e
+      JOIN users u ON u.id = e.created_by
+      WHERE (e.created_by = ? OR EXISTS (SELECT 1 FROM event_attendees ea WHERE ea.event_id = e.id AND ea.user_id = ?))
+        AND DATE(e.start_datetime) <= ? AND DATE(e.end_datetime) >= ?
+      ORDER BY e.start_datetime ASC
+    `).all(userId, userId, endOfMonth, startOfMonth);
+
+    const getAttendees = db.prepare(`
+      SELECT ea.*, u.username, u.full_name
+      FROM event_attendees ea JOIN users u ON u.id = ea.user_id
+      WHERE ea.event_id = ?
+    `);
+
+    const enriched = events.map(e => ({ ...e, attendees: getAttendees.all(e.id), readonly: false }));
+
+    const taskDeadlines = db.prepare(`
+      SELECT DISTINCT t.id, t.name, t.due_date, tl.project_id
+      FROM tasks t
+      JOIN task_lists tl ON tl.id = t.task_list_id
+      JOIN project_members pm ON pm.project_id = tl.project_id AND pm.user_id = ?
+      WHERE t.due_date IS NOT NULL AND t.due_date >= ? AND t.due_date <= ?
+    `).all(userId, startOfMonth, endOfMonth);
+
+    const taskEvents = taskDeadlines.map(t => ({
+      id: `task-${t.id}`,
+      title: t.name,
+      description: null,
+      start_datetime: `${t.due_date}T09:00:00`,
+      end_datetime: `${t.due_date}T10:00:00`,
+      type: 'deadline',
+      color: '#DC2626',
+      created_by: null,
+      project_id: t.project_id,
+      created_at: null,
+      attendees: [],
+      readonly: true,
+    }));
+
+    return res.json({ data: [...enriched, ...taskEvents], message: 'Success' });
+  } catch (err) {
+    console.error('[GET /api/events]', err);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to fetch events' } });
+  }
+});
+
+app.post('/api/events', requireAuth, (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { title, description, start_datetime, end_datetime, type, color, project_id, attendee_ids } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(422).json({ error: { code: 'VALIDATION_ERROR', message: 'Title is required' } });
+    }
+    if (!start_datetime || !end_datetime) {
+      return res.status(422).json({ error: { code: 'VALIDATION_ERROR', message: 'Start and end datetime are required' } });
+    }
+    const validTypes = ['event', 'meeting', 'deadline'];
+    const eventType = validTypes.includes(type) ? type : 'event';
+    const eventColor = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#0066CC';
+
+    const eventId = db.transaction(() => {
+      const result = db.prepare(`
+        INSERT INTO events (title, description, start_datetime, end_datetime, type, color, created_by, project_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        title.trim().substring(0, 200),
+        description ? description.trim().substring(0, 2000) : null,
+        start_datetime, end_datetime, eventType, eventColor, userId, project_id || null
+      );
+      const eid = result.lastInsertRowid;
+      db.prepare(`INSERT OR IGNORE INTO event_attendees (event_id, user_id, status) VALUES (?, ?, 'accepted')`).run(eid, userId);
+      if (Array.isArray(attendee_ids)) {
+        const ins = db.prepare(`INSERT OR IGNORE INTO event_attendees (event_id, user_id, status) VALUES (?, ?, 'invited')`);
+        for (const aid of attendee_ids) {
+          if (aid !== userId) ins.run(eid, aid);
+        }
+      }
+      return eid;
+    })();
+
+    const event = db.prepare(`
+      SELECT e.*, u.username AS creator_name, u.full_name AS creator_full_name
+      FROM events e JOIN users u ON u.id = e.created_by WHERE e.id = ?
+    `).get(eventId);
+    const attendees = db.prepare(`
+      SELECT ea.*, u.username, u.full_name FROM event_attendees ea JOIN users u ON u.id = ea.user_id WHERE ea.event_id = ?
+    `).all(eventId);
+
+    return res.status(201).json({ data: { ...event, attendees, readonly: false }, message: 'Event created' });
+  } catch (err) {
+    console.error('[POST /api/events]', err);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to create event' } });
+  }
+});
+
+app.put('/api/events/:id', requireAuth, (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const eventId = parseInt(req.params.id, 10);
+    const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+    if (!event) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Event not found' } });
+    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(userId);
+    if (event.created_by !== userId && user.role !== 'admin') {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Not authorized to edit this event' } });
+    }
+    const { title, description, start_datetime, end_datetime, type, color, project_id } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(422).json({ error: { code: 'VALIDATION_ERROR', message: 'Title is required' } });
+    }
+    const validTypes = ['event', 'meeting', 'deadline'];
+    const eventType = validTypes.includes(type) ? type : event.type;
+    const eventColor = /^#[0-9a-fA-F]{6}$/.test(color) ? color : event.color;
+
+    db.prepare(`
+      UPDATE events SET title=?, description=?, start_datetime=?, end_datetime=?, type=?, color=?, project_id=?
+      WHERE id=?
+    `).run(
+      title.trim().substring(0, 200),
+      description ? description.trim().substring(0, 2000) : null,
+      start_datetime || event.start_datetime,
+      end_datetime || event.end_datetime,
+      eventType, eventColor,
+      project_id !== undefined ? (project_id || null) : event.project_id,
+      eventId
+    );
+
+    const updated = db.prepare(`
+      SELECT e.*, u.username AS creator_name, u.full_name AS creator_full_name
+      FROM events e JOIN users u ON u.id = e.created_by WHERE e.id = ?
+    `).get(eventId);
+    const attendees = db.prepare(`
+      SELECT ea.*, u.username, u.full_name FROM event_attendees ea JOIN users u ON u.id = ea.user_id WHERE ea.event_id = ?
+    `).all(eventId);
+
+    return res.json({ data: { ...updated, attendees, readonly: false }, message: 'Event updated' });
+  } catch (err) {
+    console.error('[PUT /api/events/:id]', err);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to update event' } });
+  }
+});
+
+app.delete('/api/events/:id', requireAuth, (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const eventId = parseInt(req.params.id, 10);
+    const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+    if (!event) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Event not found' } });
+    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(userId);
+    if (event.created_by !== userId && user.role !== 'admin') {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Not authorized to delete this event' } });
+    }
+    db.transaction(() => {
+      db.prepare('DELETE FROM event_attendees WHERE event_id = ?').run(eventId);
+      db.prepare('DELETE FROM events WHERE id = ?').run(eventId);
+    })();
+    return res.json({ data: {}, message: 'Event deleted' });
+  } catch (err) {
+    console.error('[DELETE /api/events/:id]', err);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to delete event' } });
+  }
+});
+
+app.post('/api/events/:id/attendees', requireAuth, (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const eventId = parseInt(req.params.id, 10);
+    const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+    if (!event) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Event not found' } });
+    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(userId);
+    if (event.created_by !== userId && user.role !== 'admin') {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Not authorized to invite to this event' } });
+    }
+    const { user_ids } = req.body;
+    if (!Array.isArray(user_ids) || user_ids.length === 0) {
+      return res.status(422).json({ error: { code: 'VALIDATION_ERROR', message: 'user_ids array is required' } });
+    }
+    const ins = db.prepare(`INSERT OR IGNORE INTO event_attendees (event_id, user_id, status) VALUES (?, ?, 'invited')`);
+    for (const uid of user_ids) ins.run(eventId, uid);
+    const attendees = db.prepare(`
+      SELECT ea.*, u.username, u.full_name FROM event_attendees ea JOIN users u ON u.id = ea.user_id WHERE ea.event_id = ?
+    `).all(eventId);
+    return res.json({ data: { attendees }, message: 'Attendees invited' });
+  } catch (err) {
+    console.error('[POST /api/events/:id/attendees]', err);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to invite attendees' } });
+  }
+});
+
+app.put('/api/events/:id/attendees', requireAuth, (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const eventId = parseInt(req.params.id, 10);
+    const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+    if (!event) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Event not found' } });
+    const attendee = db.prepare('SELECT * FROM event_attendees WHERE event_id = ? AND user_id = ?').get(eventId, userId);
+    if (!attendee) return res.status(403).json({ error: { code: 'NOT_ATTENDEE', message: 'You are not invited to this event' } });
+    const { status } = req.body;
+    if (!['accepted', 'declined'].includes(status)) {
+      return res.status(422).json({ error: { code: 'VALIDATION_ERROR', message: 'Status must be accepted or declined' } });
+    }
+    db.prepare('UPDATE event_attendees SET status = ? WHERE event_id = ? AND user_id = ?').run(status, eventId, userId);
+    return res.json({ data: { status }, message: 'RSVP updated' });
+  } catch (err) {
+    console.error('[PUT /api/events/:id/attendees]', err);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Failed to update RSVP' } });
+  }
+});
+
 // ─── Admin Routes ────────────────────────────────────────────────────────────
 
 app.get('/api/admin/users', requireAdmin, (_req, res) => {

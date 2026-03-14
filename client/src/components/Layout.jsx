@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, User, Shield } from 'lucide-react';
+import { LayoutDashboard, User, Shield, CalendarDays } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Navbar } from './Navbar';
 import { ChatPanel } from './ChatPanel';
@@ -12,6 +12,7 @@ function BottomTabBar() {
 
   const tabs = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Home' },
+    { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
     ...(isAdmin ? [{ to: '/admin', icon: Shield, label: 'Admin' }] : []),
     { to: '/profile', icon: User, label: 'Profile' },
   ];

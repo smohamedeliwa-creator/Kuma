@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, Sun, Moon, Shield, Bell, CheckCheck, UserPlus, MessageSquare, ArrowRightLeft, MessageSquareText } from 'lucide-react';
+import { LogOut, Sun, Moon, Shield, Bell, CheckCheck, UserPlus, MessageSquare, ArrowRightLeft, MessageSquareText, CalendarDays } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,16 @@ export function Navbar({ darkMode, onToggleDark, unreadMessages = 0, onOpenChat 
 
         {/* Right: actions */}
         <div className="flex items-center gap-1">
+          {/* Calendar link */}
+          {user && (
+            <Button variant="ghost" size="sm" asChild className="hidden sm:flex">
+              <Link to="/calendar" className="flex items-center gap-1.5">
+                <CalendarDays className="h-4 w-4" />
+                <span>Calendar</span>
+              </Link>
+            </Button>
+          )}
+
           {/* Admin link */}
           {user?.role === 'admin' && (
             <Button variant="ghost" size="sm" asChild className="hidden sm:flex">

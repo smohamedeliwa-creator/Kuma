@@ -207,6 +207,38 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
 `);
 
+// ─── Calendar Tables ──────────────────────────────────────────────────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    start_datetime TEXT NOT NULL,
+    end_datetime TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'event' CHECK(type IN ('event', 'meeting', 'deadline')),
+    color TEXT NOT NULL DEFAULT '#0066CC',
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    project_id INTEGER REFERENCES projects(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS event_attendees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL REFERENCES events(id),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    status TEXT NOT NULL DEFAULT 'invited' CHECK(status IN ('invited', 'accepted', 'declined')),
+    UNIQUE(event_id, user_id)
+  );
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_events_created_by ON events(created_by);
+  CREATE INDEX IF NOT EXISTS idx_events_start ON events(start_datetime);
+  CREATE INDEX IF NOT EXISTS idx_event_attendees_event ON event_attendees(event_id);
+  CREATE INDEX IF NOT EXISTS idx_event_attendees_user ON event_attendees(user_id);
+`);
+
 // Remove CHECK constraint on tasks.status to allow custom status keys
 const taskTableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get();
 if (taskTableSql && taskTableSql.sql && taskTableSql.sql.includes('CHECK')) {
