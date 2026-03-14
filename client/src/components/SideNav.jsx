@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarDays, MessageSquareText, Shield,
-  ChevronRight, ChevronLeft, Menu, Plus, LogOut, Sun, Moon,
+  ChevronRight, ChevronLeft, Menu, X, Plus, LogOut, Sun, Moon,
   Bell, CheckCheck, UserPlus, MessageSquare, ArrowRightLeft,
 } from 'lucide-react';
 import api from '@/lib/api';
@@ -66,16 +66,16 @@ function NavRow({ to, icon: Icon, label, collapsed, badge, onClick, exact }) {
     ? exact ? pathname === to : pathname === to || pathname.startsWith(to + '/')
     : false;
 
-  const base = `relative flex items-center gap-3 rounded-md text-sm font-medium transition-colors select-none
-    ${collapsed ? 'justify-center px-0 py-2 w-full' : 'px-3 py-2 w-full'}
+  const base = `relative flex items-center gap-3 rounded-md text-sm font-medium transition-colors select-none h-10
+    ${collapsed ? 'justify-center px-0 w-full' : 'px-4 w-full'}
     ${isActive
       ? 'bg-[#EDE9FE] text-[#7C3AED] dark:bg-[#1E1B2E] dark:text-[#A78BFA] border-l-[3px] border-[#7C3AED]'
       : 'text-[#111111] dark:text-[#F5F5F5] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]'}
-    ${isActive && !collapsed ? '-ml-px pl-[11px]' : ''}`;
+    ${isActive && !collapsed ? '-ml-px pl-[13px]' : ''}`;
 
   const inner = (
     <>
-      <Icon className="h-4 w-4 shrink-0" />
+      <Icon className="h-5 w-5 shrink-0" />
       {!collapsed && <span className="flex-1 truncate">{label}</span>}
       {badge > 0 && !collapsed && (
         <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#7C3AED] px-1 text-[10px] font-bold text-white">
@@ -151,7 +151,7 @@ function NewProjectDialog({ open, onOpenChange, onCreated }) {
 
 // ─── Side Nav ─────────────────────────────────────────────────────────────────
 
-export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, unreadMessages, onOpenChat }) {
+export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, unreadMessages }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -251,12 +251,13 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
         className={[
           'fixed left-0 top-0 z-50 flex h-full flex-col',
           'border-r border-[#E5E5E5] bg-white dark:border-[#1F1F1F] dark:bg-[#111111]',
-          collapsed ? 'w-[60px]' : 'w-[260px]',
+          'w-[260px]',
+          collapsed ? 'lg:w-[60px]' : 'lg:w-[260px]',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         ].join(' ')}
       >
         {/* ── Logo row ── */}
-        <div className={`flex h-14 shrink-0 items-center border-b border-[#E5E5E5] dark:border-[#1F1F1F] ${collapsed ? 'justify-center' : 'justify-between px-4'}`}>
+        <div className={`flex h-14 shrink-0 items-center border-b border-[#E5E5E5] dark:border-[#1F1F1F] ${collapsed ? 'lg:justify-center' : 'justify-between px-4'}`}>
           <Link
             to="/dashboard"
             className="flex items-center gap-2 min-w-0"
@@ -266,11 +267,21 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
             {!collapsed && (
               <span className="truncate font-bold text-[#111111] dark:text-[#F5F5F5]">Kuma</span>
             )}
+            {collapsed && <span className="truncate font-bold text-[#111111] dark:text-[#F5F5F5] lg:hidden">Kuma</span>}
           </Link>
+          {/* Mobile X close button */}
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="ml-1 shrink-0 rounded-md p-1.5 text-[#6B7280] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] transition-colors lg:hidden"
+            aria-label="Close sidebar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          {/* Desktop collapse button */}
           {!collapsed && (
             <button
               onClick={() => onCollapsedChange(true)}
-              className="ml-1 shrink-0 rounded-md p-1.5 text-[#6B7280] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] transition-colors"
+              className="ml-1 shrink-0 rounded-md p-1.5 text-[#6B7280] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] transition-colors hidden lg:flex"
               aria-label="Collapse sidebar"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -281,12 +292,12 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
         {/* ── Scrollable nav area ── */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 space-y-0.5">
 
-          {/* Expand button when collapsed */}
+          {/* Expand button when collapsed — desktop only */}
           {collapsed && (
             <Tip label="Expand sidebar" show>
               <button
                 onClick={() => onCollapsedChange(false)}
-                className="mb-1 flex w-full items-center justify-center rounded-md py-2 text-[#6B7280] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] transition-colors"
+                className="mb-1 hidden lg:flex w-full items-center justify-center rounded-md py-2 text-[#6B7280] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] transition-colors"
                 aria-label="Expand sidebar"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -298,11 +309,11 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
           <NavRow to="/dashboard" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed} exact />
           <NavRow to="/calendar" icon={CalendarDays} label="Calendar" collapsed={collapsed} />
           <NavRow
+            to="/chat"
             icon={MessageSquareText}
             label="Chat"
             collapsed={collapsed}
             badge={unreadMessages}
-            onClick={() => { onOpenChat(); setMobileOpen(false); }}
           />
 
           {/* Notifications */}
@@ -310,11 +321,11 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
             <PopoverTrigger asChild>
               <Tip label="Notifications" show={collapsed}>
                 <button
-                  className={`relative flex w-full items-center gap-3 rounded-md text-sm font-medium transition-colors
+                  className={`relative flex w-full items-center gap-3 rounded-md text-sm font-medium transition-colors h-10
                     text-[#111111] dark:text-[#F5F5F5] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]
-                    ${collapsed ? 'justify-center py-2' : 'px-3 py-2'}`}
+                    ${collapsed ? 'justify-center' : 'px-4'}`}
                 >
-                  <Bell className="h-4 w-4 shrink-0" />
+                  <Bell className="h-5 w-5 shrink-0" />
                   {!collapsed && <span className="flex-1 text-left">Notifications</span>}
                   {unreadCount > 0 && !collapsed && (
                     <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">

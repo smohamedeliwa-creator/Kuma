@@ -10,6 +10,7 @@ const ProjectDetail = lazy(() => import('@/pages/ProjectDetail').then((m) => ({ 
 const Admin = lazy(() => import('@/pages/Admin').then((m) => ({ default: m.Admin })));
 const Profile = lazy(() => import('@/pages/Profile').then((m) => ({ default: m.Profile })));
 const CalendarPage = lazy(() => import('@/pages/Calendar').then((m) => ({ default: m.Calendar })));
+const ChatPage = lazy(() => import('@/pages/Chat').then((m) => ({ default: m.Chat })));
 const InviteAccept = lazy(() => import('@/pages/InviteAccept').then((m) => ({ default: m.InviteAccept })));
 const ShareViewPage = lazy(() => import('@/pages/ShareView').then((m) => ({ default: m.ShareView })));
 
@@ -37,6 +38,7 @@ export default function App() {
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/chat" element={<ChatPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

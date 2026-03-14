@@ -53,6 +53,11 @@
   border-color: hsl(var(--border));
 }
 
+.dark h1,
+.dark h2 {
+  color: #FFFFFF;
+}
+
 body {
   margin: 0;
   background-color: hsl(var(--background));

@@ -782,7 +782,7 @@ export function Calendar() {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Page header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold">Calendar</h1>
+        <h1 className="text-xl sm:text-2xl font-bold dark:text-white">Calendar</h1>
         <Button onClick={handleOpenCreate} size="sm" className="gap-1.5">
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">New Event</span>

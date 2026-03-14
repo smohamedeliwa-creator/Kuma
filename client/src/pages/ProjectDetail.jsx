@@ -1078,7 +1078,7 @@ function TaskCard({ task, statuses, listColumns, colValues, isAdmin, onOpen, onD
         }}
         className={[
           'relative cursor-pointer select-none space-y-2 rounded-[10px] border p-[14px]',
-          'bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08)] dark:bg-[#1A1A1A]',
+          'bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08)] dark:bg-[#1E1E1E] dark:shadow-none',
           'border-[#E5E5E5] dark:border-[#2E2E2E]',
           dueDateStatus === 'overdue'  ? 'border-l-[3px] border-l-red-500'    : '',
           dueDateStatus === 'due-soon' ? 'border-l-[3px] border-l-yellow-500' : '',

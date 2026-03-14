@@ -285,6 +285,9 @@ if (taskTableSql && taskTableSql.sql && taskTableSql.sql.includes('CHECK')) {
 const taskCols = db.pragma('table_info(tasks)').map(c => c.name);
 if (!taskCols.includes('priority')) db.exec("ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'");
 
+// Remove "Final loudness check" seed task from live DB if it exists (Fix 4)
+db.prepare("DELETE FROM tasks WHERE name = 'Final loudness check'").run();
+
 // ─── Step 4: Seed data (only if users table is empty) ─────────────────────────
 
 const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
@@ -335,7 +338,7 @@ if (userCount.count === 0) {
     insertMember.run(projectId, eng3Id);
 
     const mixingListId = insertTaskList.run(projectId, 'Mixing').lastInsertRowid;
-    const masteringListId = insertTaskList.run(projectId, 'Mastering').lastInsertRowid;
+    insertTaskList.run(projectId, 'Mastering');
 
     const task1Id = insertTask.run(
       mixingListId, 'Balance drum levels', '2025-04-01', 'in_progress', eng1Id
@@ -343,22 +346,14 @@ if (userCount.count === 0) {
     const task2Id = insertTask.run(
       mixingListId, 'Add reverb to vocals', '2025-04-05', 'todo', eng2Id
     ).lastInsertRowid;
-    const task3Id = insertTask.run(
-      masteringListId, 'Final loudness check', '2025-04-15', 'todo', adminId
-    ).lastInsertRowid;
-
     insertAssignment.run(task1Id, eng1Id, 'edit');
     insertAssignment.run(task1Id, eng2Id, 'view');
     insertAssignment.run(task2Id, eng2Id, 'edit');
     insertAssignment.run(task2Id, eng3Id, 'view');
-    insertAssignment.run(task3Id, adminId, 'edit');
-    insertAssignment.run(task3Id, eng1Id, 'view');
-    insertAssignment.run(task3Id, eng3Id, 'view');
 
     insertComment.run(task1Id, eng1Id, 'Kick drum is a bit too loud, adjusting now.');
     insertComment.run(task1Id, eng2Id, 'Agreed, also check the snare transient.');
     insertComment.run(task2Id, eng2Id, 'Using a plate reverb with 2.5s decay.');
-    insertComment.run(task3Id, adminId, 'Target is -14 LUFS for streaming platforms.');
   });
 
   seed();

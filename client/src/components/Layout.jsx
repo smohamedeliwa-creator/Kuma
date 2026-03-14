@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { SideNav } from './SideNav';
-import { ChatPanel } from './ChatPanel';
 
 export function Layout() {
   const { user, loading } = useAuth();
@@ -10,8 +9,6 @@ export function Layout() {
   const [darkMode, setDarkMode] = useState(
     () => localStorage.getItem('kuma-theme') === 'dark'
   );
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatUnread, setChatUnread] = useState(0);
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('kuma-sidenav-collapsed') === 'true'
   );
@@ -43,8 +40,6 @@ export function Layout() {
         onCollapsedChange={handleCollapsedChange}
         darkMode={darkMode}
         onToggleDark={() => setDarkMode(d => !d)}
-        unreadMessages={chatUnread}
-        onOpenChat={() => setChatOpen(true)}
       />
 
       {/* Main content — offset left by sidebar width on desktop, top on mobile for hamburger */}
@@ -57,12 +52,6 @@ export function Layout() {
       >
         <Outlet />
       </main>
-
-      <ChatPanel
-        open={chatOpen}
-        onClose={() => setChatOpen(false)}
-        onUnreadChange={setChatUnread}
-      />
     </div>
   );
 }
