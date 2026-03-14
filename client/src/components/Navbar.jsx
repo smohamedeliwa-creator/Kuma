@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, Sun, Moon, Shield, Bell, CheckCheck, UserPlus, MessageSquare, ArrowRightLeft } from 'lucide-react';
+import { LogOut, Sun, Moon, Shield, Bell, CheckCheck, UserPlus, MessageSquare, ArrowRightLeft, MessageSquareText } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ const TYPE_ICONS = {
   status: <ArrowRightLeft className="h-2.5 w-2.5" />,
 };
 
-export function Navbar({ darkMode, onToggleDark }) {
+export function Navbar({ darkMode, onToggleDark, unreadMessages = 0, onOpenChat }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
@@ -55,7 +55,7 @@ export function Navbar({ darkMode, onToggleDark }) {
         <div className="flex items-center gap-1">
           {/* Admin link */}
           {user?.role === 'admin' && (
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="ghost" size="sm" asChild className="hidden sm:flex">
               <Link to="/admin" className="flex items-center gap-1.5">
                 <Shield className="h-4 w-4" />
                 <span className="hidden sm:inline">Admin</span>
@@ -67,6 +67,18 @@ export function Navbar({ darkMode, onToggleDark }) {
           <Button variant="ghost" size="icon" onClick={onToggleDark} aria-label="Toggle theme">
             {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
+
+          {/* Chat */}
+          {user && (
+            <Button variant="ghost" size="icon" aria-label="Chat" className="relative" onClick={onOpenChat}>
+              <MessageSquareText className="h-4 w-4" />
+              {unreadMessages > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#7C3AED] text-[10px] font-bold text-white">
+                  {unreadMessages > 9 ? '9+' : unreadMessages}
+                </span>
+              )}
+            </Button>
+          )}
 
           {/* Notifications */}
           {user && (

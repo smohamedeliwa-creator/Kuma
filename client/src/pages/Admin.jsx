@@ -573,7 +573,7 @@ export function Admin() {
           <Shield className="h-5 w-5 text-[#0066CC]" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-[#1a1a2e] dark:text-white">Admin Panel</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#1a1a2e] dark:text-white">Admin Panel</h1>
           <p className="text-sm text-[hsl(var(--muted-foreground))]">Manage users, projects, and assignments</p>
         </div>
       </div>

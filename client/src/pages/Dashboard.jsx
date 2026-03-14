@@ -264,7 +264,7 @@ export function Dashboard() {
       {/* Page header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1a1a2e] dark:text-white">Projects</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#1a1a2e] dark:text-white">Projects</h1>
           {!loading && (
             <p className="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">
               {projects.length} project{projects.length !== 1 ? 's' : ''}

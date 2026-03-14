@@ -122,7 +122,7 @@ export function Profile() {
         <CardContent className="flex flex-col items-start gap-4 pt-6 sm:flex-row sm:items-center">
           <Avatar name={displayName} color={avatarColor} size="xl" />
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold truncate">{displayName}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold truncate">{displayName}</h1>
             {user.full_name && (
               <p className="text-sm text-[hsl(var(--muted-foreground))]">@{user.username}</p>
             )}

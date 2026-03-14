@@ -110,6 +110,25 @@ db.exec(`
     position INTEGER NOT NULL DEFAULT 0,
     UNIQUE(project_id, key)
   );
+
+  CREATE TABLE IF NOT EXISTS list_columns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_list_id INTEGER NOT NULL REFERENCES task_lists(id),
+    name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'text',
+    position INTEGER NOT NULL DEFAULT 0,
+    config TEXT NOT NULL DEFAULT '{}',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS task_column_values (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL REFERENCES tasks(id),
+    column_id INTEGER NOT NULL REFERENCES list_columns(id),
+    value TEXT NOT NULL DEFAULT 'null',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(task_id, column_id)
+  );
 `);
 
 // ─── Step 2: Create indexes (tables must exist first) ─────────────────────────
@@ -123,6 +142,9 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id);
   CREATE INDEX IF NOT EXISTS idx_task_exclusions_task_user ON task_exclusions(task_id, user_id);
   CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+  CREATE INDEX IF NOT EXISTS idx_list_columns_task_list ON list_columns(task_list_id);
+  CREATE INDEX IF NOT EXISTS idx_task_column_values_task ON task_column_values(task_id);
+  CREATE INDEX IF NOT EXISTS idx_task_column_values_column ON task_column_values(column_id);
 `);
 
 // ─── Step 3: Migrations (add columns if missing) ──────────────────────────────
@@ -134,6 +156,56 @@ if (!userCols.includes('avatar_color')) db.exec('ALTER TABLE users ADD COLUMN av
 const notifCols = db.pragma('table_info(notifications)').map(c => c.name);
 if (!notifCols.includes('title')) db.exec('ALTER TABLE notifications ADD COLUMN title TEXT');
 if (!notifCols.includes('link')) db.exec('ALTER TABLE notifications ADD COLUMN link TEXT');
+
+const commentCols = db.pragma('table_info(comments)').map(c => c.name);
+if (!commentCols.includes('type')) db.exec("ALTER TABLE comments ADD COLUMN type TEXT NOT NULL DEFAULT 'text'");
+if (!commentCols.includes('file_path')) db.exec('ALTER TABLE comments ADD COLUMN file_path TEXT');
+if (!commentCols.includes('file_name')) db.exec('ALTER TABLE comments ADD COLUMN file_name TEXT');
+if (!commentCols.includes('file_size')) db.exec('ALTER TABLE comments ADD COLUMN file_size INTEGER');
+if (!commentCols.includes('duration')) db.exec('ALTER TABLE comments ADD COLUMN duration INTEGER');
+if (!commentCols.includes('deleted_at')) db.exec('ALTER TABLE comments ADD COLUMN deleted_at DATETIME');
+
+// ─── Chat Tables ──────────────────────────────────────────────────────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL DEFAULT 'direct' CHECK(type IN ('direct', 'group')),
+    name TEXT,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS conversation_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(conversation_id, user_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+    sender_id INTEGER NOT NULL REFERENCES users(id),
+    content TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL DEFAULT 'text' CHECK(type IN ('text', 'voice', 'file')),
+    file_path TEXT,
+    file_name TEXT,
+    file_size INTEGER,
+    duration INTEGER,
+    read_by TEXT NOT NULL DEFAULT '[]',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME
+  );
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_conversation_members_user ON conversation_members(user_id);
+  CREATE INDEX IF NOT EXISTS idx_conversation_members_conv ON conversation_members(conversation_id);
+  CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
+  CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
+`);
 
 // Remove CHECK constraint on tasks.status to allow custom status keys
 const taskTableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get();

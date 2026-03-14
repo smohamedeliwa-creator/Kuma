@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronDown, ChevronRight, Plus, ArrowLeft, Trash2, Pencil,
   Send, Calendar, User, MessageSquare, Loader2, Mail, Copy, Check,
-  UserPlus, X, SlidersHorizontal,
+  UserPlus, X, SlidersHorizontal, Mic, Paperclip, Play, Pause,
+  Download, FileText, Image as ImageIcon, Music2, Video, StopCircle, MoreHorizontal,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -30,23 +31,156 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import {
+  ColumnTypeIcon, ColumnCellValue, ColumnField, AddColumnButton, ColumnSettingsDialog,
+} from '@/components/CustomColumns';
+
+function getContrastColor(hex) {
+  try {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const toLinear = c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+    return L > 0.179 ? '#1a1a2e' : '#ffffff';
+  } catch {
+    return '#ffffff';
+  }
+}
 
 function StatusBadge({ statusKey, statuses = [] }) {
   const s = statuses.find(x => x.key === statusKey);
   if (!s) return <span className="text-xs text-[hsl(var(--muted-foreground))]">{statusKey}</span>;
+  const textColor = getContrastColor(s.color);
   return (
     <span
-      className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium text-white"
-      style={{ backgroundColor: s.color }}
+      className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+      style={{ backgroundColor: s.color, color: textColor }}
     >
       {s.label}
     </span>
   );
 }
 
+// ─── Comment Helpers ──────────────────────────────────────────────────────────
+
+function formatDuration(seconds) {
+  const s = Math.floor(seconds || 0);
+  const m = Math.floor(s / 60);
+  return `${m}:${(s % 60).toString().padStart(2, '0')}`;
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getFileIcon(fileName) {
+  const ext = (fileName || '').split('.').pop().toLowerCase();
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return ImageIcon;
+  if (['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'].includes(ext)) return Music2;
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return Video;
+  return FileText;
+}
+
+function isImageFile(fileName) {
+  const ext = (fileName || '').split('.').pop().toLowerCase();
+  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+}
+
+function AudioPlayer({ src, duration }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const BAR_COUNT = 28;
+  const bars = useRef(
+    Array.from({ length: BAR_COUNT }, () => Math.random() * 0.65 + 0.35)
+  ).current;
+
+  function toggle() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) { audio.pause(); setPlaying(false); }
+    else { audio.play(); setPlaying(true); }
+  }
+
+  const progress = duration > 0 ? Math.min((currentTime || 0) / duration, 1) : 0;
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg bg-[hsl(var(--background))] px-3 py-2">
+      <audio
+        ref={audioRef}
+        src={src}
+        onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime || 0)}
+        onEnded={() => { setPlaying(false); setCurrentTime(0); }}
+      />
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0066CC] text-white hover:bg-[#0055aa] transition-colors"
+        aria-label={playing ? 'Pause' : 'Play'}
+      >
+        {playing
+          ? <Pause className="h-3.5 w-3.5" />
+          : <Play className="h-3.5 w-3.5 ml-0.5" />}
+      </button>
+      <div className="flex flex-1 items-end gap-px h-6" aria-hidden>
+        {bars.map((h, i) => (
+          <div
+            key={i}
+            className="flex-1 max-w-[4px] rounded-full transition-colors duration-100"
+            style={{
+              height: `${h * 100}%`,
+              backgroundColor: i / BAR_COUNT <= progress ? '#0066CC' : 'hsl(var(--muted-foreground))',
+              opacity: i / BAR_COUNT <= progress ? 1 : 0.35,
+            }}
+          />
+        ))}
+      </div>
+      <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0 font-mono w-10 text-right">
+        {formatDuration(playing ? currentTime : (duration || 0))}
+      </span>
+    </div>
+  );
+}
+
+function FileAttachment({ fileName, filePath, fileSize }) {
+  const FileIcon = getFileIcon(fileName);
+  const isImage = isImageFile(fileName);
+  const href = `/uploads/${filePath}`;
+
+  return (
+    <div className="space-y-1.5">
+      {isImage && (
+        <img
+          src={href}
+          alt={fileName}
+          className="max-h-48 w-full rounded-md object-cover"
+          width={400}
+          height={192}
+        />
+      )}
+      <a
+        href={href}
+        download={fileName}
+        className="flex items-center gap-2 rounded-lg border border-[hsl(var(--border))] px-3 py-2 hover:bg-[hsl(var(--muted))] transition-colors group"
+      >
+        <FileIcon className="h-5 w-5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium truncate">{fileName}</p>
+          {fileSize && <p className="text-xs text-[hsl(var(--muted-foreground))]">{formatFileSize(fileSize)}</p>}
+        </div>
+        <Download className="h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))] opacity-0 group-hover:opacity-100 transition-opacity" />
+      </a>
+    </div>
+  );
+}
+
 // ─── Task Detail Sheet ────────────────────────────────────────────────────────
 
-function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, onDeleted, statuses = [] }) {
+function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, onDeleted, statuses = [], listColumns = [], onColValuesSaved }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [task, setTask] = useState(null);
@@ -54,6 +188,25 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
   const [commentText, setCommentText] = useState('');
   const [saving, setSaving] = useState(false);
   const [sendingComment, setSendingComment] = useState(false);
+
+  // Voice recording
+  const [recording, setRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [voiceBlob, setVoiceBlob] = useState(null);
+  const [voiceDuration, setVoiceDuration] = useState(0);
+  const [voiceUrl, setVoiceUrl] = useState(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordTimerRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  // File attachment
+  const [attachedFile, setAttachedFile] = useState(null);
+
+  // Comment delete
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [deleteCommentTarget, setDeleteCommentTarget] = useState(null);
+  const [deletingComment, setDeletingComment] = useState(false);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -67,27 +220,36 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
   const [newPermission, setNewPermission] = useState('view');
   const [assigneeBusy, setAssigneeBusy] = useState(false);
 
+  // Custom column values
+  const [colValues, setColValues] = useState({});
+  const saveTimeouts = useRef({});
+
   useEffect(() => {
     if (!open || !taskId) return;
     setLoading(true);
     setTask(null);
+    setColValues({});
     Promise.all([
       api.get(`/api/tasks/${taskId}`),
       api.get(`/api/tasks/${taskId}/comments`),
-    ]).then(([taskRes, commentsRes]) => {
+      api.get(`/api/tasks/${taskId}/column-values`),
+    ]).then(([taskRes, commentsRes, colValsRes]) => {
       const t = taskRes.data;
       setTask(t);
       setName(t.name);
       setDueDate(t.due_date || '');
       setStatus(t.status);
       setComments(commentsRes.data);
+      const vals = {};
+      for (const v of colValsRes.data) vals[v.column_id] = v.value;
+      setColValues(vals);
     }).finally(() => setLoading(false));
   }, [open, taskId]);
 
   useEffect(() => {
-    if (!open || !projectId || !isAdmin) return;
+    if (!open || !projectId) return;
     api.get(`/api/projects/${projectId}`).then(res => setProjectMembers(res.data.members || []));
-  }, [open, projectId, isAdmin]);
+  }, [open, projectId]);
 
   async function handleAddAssignee(memberId) {
     setAssigneeBusy(true);
@@ -162,16 +324,112 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
     }
   }
 
-  async function handleComment(e) {
+  async function handleColValueChange(colId, value) {
+    setColValues(prev => ({ ...prev, [colId]: value }));
+    clearTimeout(saveTimeouts.current[colId]);
+    saveTimeouts.current[colId] = setTimeout(async () => {
+      try {
+        const res = await api.put(`/api/tasks/${taskId}/column-values`, {
+          values: [{ column_id: colId, value }],
+        });
+        onColValuesSaved?.(taskId, res.data);
+      } catch {
+        // silent — values still in local state
+      }
+    }, 300);
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        setVoiceBlob(blob);
+        setVoiceUrl(url);
+        setVoiceDuration(recordingSeconds);
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setRecording(true);
+      setRecordingSeconds(0);
+      recordTimerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    } catch {
+      toast({ title: 'Microphone access denied', variant: 'destructive' });
+    }
+  }
+
+  function stopRecording() {
+    clearInterval(recordTimerRef.current);
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  }
+
+  function clearVoice() {
+    if (voiceUrl) URL.revokeObjectURL(voiceUrl);
+    setVoiceBlob(null);
+    setVoiceUrl(null);
+    setVoiceDuration(0);
+    setRecordingSeconds(0);
+  }
+
+  function handleFileSelect(e) {
+    const file = e.target.files?.[0];
+    if (file) setAttachedFile(file);
+    e.target.value = '';
+  }
+
+  async function handleSend(e) {
     e.preventDefault();
-    if (!commentText.trim()) return;
+    if (!commentText.trim() && !voiceBlob && !attachedFile) return;
     setSendingComment(true);
     try {
-      const res = await api.post(`/api/tasks/${taskId}/comments`, { content: commentText });
-      setComments((prev) => [...prev, res.data]);
-      setCommentText('');
+      let newComment;
+      if (voiceBlob) {
+        const form = new FormData();
+        form.append('file', voiceBlob, 'voice.webm');
+        form.append('type', 'voice');
+        form.append('duration', String(voiceDuration));
+        const res = await api.post(`/api/tasks/${taskId}/comments/upload`, form);
+        newComment = res.data;
+        clearVoice();
+      } else if (attachedFile) {
+        const form = new FormData();
+        form.append('file', attachedFile);
+        form.append('type', 'file');
+        const res = await api.post(`/api/tasks/${taskId}/comments/upload`, form);
+        newComment = res.data;
+        setAttachedFile(null);
+      } else {
+        const res = await api.post(`/api/tasks/${taskId}/comments`, { content: commentText });
+        newComment = res.data;
+        setCommentText('');
+      }
+      setComments((prev) => [...prev, newComment]);
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to post comment', variant: 'destructive' });
     } finally {
       setSendingComment(false);
+    }
+  }
+
+  async function handleDeleteComment() {
+    if (!deleteCommentTarget) return;
+    setDeletingComment(true);
+    try {
+      await api.delete(`/api/comments/${deleteCommentTarget}`);
+      setComments((prev) =>
+        prev.map((c) => c.id === deleteCommentTarget ? { ...c, deleted_at: new Date().toISOString() } : c)
+      );
+      setDeleteCommentTarget(null);
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to delete comment', variant: 'destructive' });
+    } finally {
+      setDeletingComment(false);
     }
   }
 
@@ -353,6 +611,30 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
                 </div>
               </div>
 
+              {/* Custom column properties */}
+              {listColumns.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
+                    Properties
+                  </h4>
+                  {listColumns.map(col => (
+                    <div key={col.id} className="space-y-1.5">
+                      <Label className="flex items-center gap-1.5 text-xs">
+                        <ColumnTypeIcon type={col.type} />
+                        {col.name}
+                      </Label>
+                      <ColumnField
+                        column={col}
+                        value={colValues[col.id] ?? null}
+                        onChange={val => handleColValueChange(col.id, val)}
+                        members={projectMembers}
+                        canEdit={canEdit}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <Separator />
 
               {/* Comments */}
@@ -371,44 +653,152 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
                       No comments yet.
                     </p>
                   ) : (
-                    comments.map((c) => (
-                      <div key={c.id} className="rounded-lg bg-[hsl(var(--muted))] p-3">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span className="text-xs font-semibold text-[#0066CC]">{c.username}</span>
-                          <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                            {new Date(c.created_at).toLocaleString(undefined, {
-                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                            })}
-                          </span>
+                    comments.map((c) => {
+                      const isDeleted = !!c.deleted_at;
+                      const canDeleteComment = c.user_id === user?.id || isAdmin;
+                      return (
+                        <div key={c.id} className="group relative rounded-lg bg-[hsl(var(--muted))] p-3">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-xs font-semibold text-[#0066CC]">{c.username}</span>
+                            <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                              {new Date(c.created_at).toLocaleString(undefined, {
+                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                              })}
+                            </span>
+                            {!isDeleted && c.type === 'voice' && (
+                              <span className="text-[10px] bg-[#0066CC]/10 text-[#0066CC] rounded-full px-1.5 py-0.5 font-medium">
+                                Voice
+                              </span>
+                            )}
+                            {!isDeleted && canDeleteComment && (
+                              <div className="ml-auto">
+                                <Popover open={openMenuId === c.id} onOpenChange={(v) => setOpenMenuId(v ? c.id : null)}>
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      className="flex h-6 w-6 items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]"
+                                      aria-label="Comment actions"
+                                    >
+                                      <MoreHorizontal className="h-3.5 w-3.5" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent align="end" className="w-32 p-1">
+                                    <button
+                                      onClick={() => { setDeleteCommentTarget(c.id); setOpenMenuId(null); }}
+                                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      Delete
+                                    </button>
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                            )}
+                          </div>
+                          {isDeleted ? (
+                            <p className="text-sm italic text-[hsl(var(--muted-foreground))]">This comment was deleted.</p>
+                          ) : c.type === 'voice' ? (
+                            <AudioPlayer src={`/uploads/${c.file_path}`} duration={c.duration || 0} />
+                          ) : c.type === 'file' ? (
+                            <FileAttachment fileName={c.file_name} filePath={c.file_path} fileSize={c.file_size} />
+                          ) : (
+                            <p className="text-sm leading-relaxed">{c.content}</p>
+                          )}
                         </div>
-                        <p className="text-sm leading-relaxed">{c.content}</p>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
 
                 {canEdit && (
-                  <form onSubmit={handleComment} className="space-y-2">
-                    <Textarea
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      placeholder="Write a comment…"
-                      rows={2}
-                      className="resize-none"
-                    />
-                    <Button
-                      type="submit"
-                      size="sm"
-                      disabled={!commentText.trim() || sendingComment}
-                      className="w-full"
-                    >
-                      {sendingComment ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                      Post Comment
-                    </Button>
+                  <form onSubmit={handleSend} className="space-y-2">
+                    {/* Voice preview */}
+                    {voiceUrl && !recording && (
+                      <div className="rounded-lg border border-[hsl(var(--border))] p-2 space-y-1.5">
+                        <AudioPlayer src={voiceUrl} duration={voiceDuration} />
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-[hsl(var(--muted-foreground))]">Voice note · {formatDuration(voiceDuration)}</span>
+                          <button type="button" onClick={clearVoice} className="text-xs text-red-500 hover:text-red-700">
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* File preview */}
+                    {attachedFile && (
+                      <div className="flex items-center gap-2 rounded-lg border border-[hsl(var(--border))] px-3 py-2">
+                        {React.createElement(getFileIcon(attachedFile.name), { className: 'h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))]' })}
+                        <span className="text-sm truncate flex-1">{attachedFile.name}</span>
+                        <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0">{formatFileSize(attachedFile.size)}</span>
+                        <button type="button" onClick={() => setAttachedFile(null)} className="text-[hsl(var(--muted-foreground))] hover:text-red-500">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Text input — hidden when voice/file selected */}
+                    {!voiceBlob && !attachedFile && !recording && (
+                      <Textarea
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        placeholder="Write a comment…"
+                        rows={2}
+                        className="resize-none"
+                      />
+                    )}
+
+                    {/* Recording indicator */}
+                    {recording && (
+                      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/20 px-3 py-2">
+                        <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                        <span className="text-sm text-red-600 dark:text-red-400 font-mono">{formatDuration(recordingSeconds)}</span>
+                        <span className="text-xs text-red-500">Recording…</span>
+                      </div>
+                    )}
+
+                    {/* Toolbar */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={recording ? stopRecording : startRecording}
+                        disabled={!!voiceBlob || !!attachedFile}
+                        className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors disabled:opacity-40 ${
+                          recording
+                            ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-950/30 dark:text-red-400'
+                            : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'
+                        }`}
+                        aria-label={recording ? 'Stop recording' : 'Record voice note'}
+                        title={recording ? 'Stop recording' : 'Record voice note'}
+                      >
+                        {recording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                      </button>
+
+                      <label
+                        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors ${(recording || !!voiceBlob) ? 'opacity-40 pointer-events-none' : ''}`}
+                        title="Attach file"
+                      >
+                        <Paperclip className="h-4 w-4" />
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          className="sr-only"
+                          onChange={handleFileSelect}
+                          disabled={recording || !!voiceBlob}
+                        />
+                      </label>
+
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={(!commentText.trim() && !voiceBlob && !attachedFile) || sendingComment || recording}
+                        className="ml-auto"
+                      >
+                        {sendingComment
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <Send className="h-4 w-4" />}
+                        Send
+                      </Button>
+                    </div>
                   </form>
                 )}
               </div>
@@ -417,7 +807,25 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
         </SheetContent>
       </Sheet>
 
-      {/* Delete confirmation */}
+      {/* Delete comment confirmation */}
+      <AlertDialog open={Boolean(deleteCommentTarget)} onOpenChange={(v) => !v && setDeleteCommentTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this comment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The comment will be marked as deleted and its content will no longer be visible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteComment} disabled={deletingComment}>
+              {deletingComment ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete task confirmation */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -438,7 +846,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
 
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, columns, statuses = [], onClick }) {
+function TaskRow({ task, columns, statuses = [], listColumns = [], colValues = {}, onClick }) {
   const dueDateStatus = getDueDateStatus(task.due_date);
 
   const cells = {
@@ -475,6 +883,11 @@ function TaskRow({ task, columns, statuses = [], onClick }) {
       {columns.filter(c => c.visible).map(c => (
         <React.Fragment key={c.column_key}>{cells[c.column_key]}</React.Fragment>
       ))}
+      {listColumns.map(col => (
+        <td key={col.id} className="px-3 py-2.5 text-sm">
+          <ColumnCellValue column={col} value={colValues[col.id] ?? null} />
+        </td>
+      ))}
     </tr>
   );
 }
@@ -509,6 +922,14 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
   // Delete
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  // Custom columns
+  const [listColumns, setListColumns] = useState([]);
+  const [colValues, setColValues] = useState({}); // { [taskId]: { [colId]: value } }
+  const [dragColId, setDragColId] = useState(null);
+  const [dragOverColId, setDragOverColId] = useState(null);
+  const [settingsCol, setSettingsCol] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   async function handleRenameSubmit(e) {
     e.preventDefault();
     if (!renameValue.trim() || renameValue.trim() === list.name) { setRenaming(false); return; }
@@ -536,10 +957,20 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
   }
 
   useEffect(() => {
-    api.get(`/api/task-lists/${list.id}/tasks`).then((res) => {
-      setTasks(res.data);
-      setLoading(false);
-    });
+    Promise.all([
+      api.get(`/api/task-lists/${list.id}/tasks`),
+      api.get(`/api/task-lists/${list.id}/columns`),
+      api.get(`/api/task-lists/${list.id}/column-values`),
+    ]).then(([tasksRes, colsRes, valuesRes]) => {
+      setTasks(tasksRes.data);
+      setListColumns(colsRes.data);
+      const vals = {};
+      for (const v of valuesRes.data) {
+        if (!vals[v.task_id]) vals[v.task_id] = {};
+        vals[v.task_id][v.column_id] = v.value;
+      }
+      setColValues(vals);
+    }).finally(() => setLoading(false));
   }, [list.id]);
 
   function handleTaskUpdated(updated) {
@@ -548,6 +979,33 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
 
   function handleTaskDeleted(taskId) {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
+  }
+
+  function handleColValuesSaved(taskId, updatedValues) {
+    setColValues(prev => {
+      const taskVals = { ...(prev[taskId] || {}) };
+      for (const v of updatedValues) taskVals[v.column_id] = v.value;
+      return { ...prev, [taskId]: taskVals };
+    });
+  }
+
+  async function handleColumnDrop(draggedId, targetId) {
+    if (draggedId === targetId) return;
+    const ids = listColumns.map(c => c.id);
+    const fromIdx = ids.indexOf(draggedId);
+    const toIdx = ids.indexOf(targetId);
+    ids.splice(fromIdx, 1);
+    ids.splice(toIdx, 0, draggedId);
+    const optimistic = ids.map((id, i) => ({ ...listColumns.find(c => c.id === id), position: i }));
+    setListColumns(optimistic);
+    try {
+      const res = await api.put(`/api/task-lists/${list.id}/columns/reorder`, { ids });
+      setListColumns(res.data);
+    } catch {
+      setListColumns(listColumns);
+    }
+    setDragColId(null);
+    setDragOverColId(null);
   }
 
   async function handleCreateTask(e) {
@@ -654,11 +1112,42 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
                     {columns.filter(c => c.visible).map((c, i) => (
                       <th
                         key={c.column_key}
-                        className={`py-2 font-medium ${i === 0 ? 'pl-4 pr-3' : i === columns.filter(x => x.visible).length - 1 ? 'px-3 pr-4' : 'px-3'}`}
+                        className={`py-2 font-medium ${i === 0 ? 'pl-4 pr-3' : 'px-3'}`}
                       >
                         {c.label}
                       </th>
                     ))}
+                    {listColumns.map(col => (
+                      <th
+                        key={col.id}
+                        className={`px-3 py-2 font-medium cursor-grab select-none transition-colors ${dragOverColId === col.id ? 'bg-[hsl(var(--muted))]' : ''}`}
+                        draggable
+                        onDragStart={() => setDragColId(col.id)}
+                        onDragOver={e => { e.preventDefault(); setDragOverColId(col.id); }}
+                        onDragLeave={() => setDragOverColId(null)}
+                        onDrop={() => handleColumnDrop(dragColId, col.id)}
+                        onDragEnd={() => { setDragColId(null); setDragOverColId(null); }}
+                      >
+                        <div className="flex items-center gap-1 group/col">
+                          <ColumnTypeIcon type={col.type} />
+                          <span>{col.name}</span>
+                          {isAdmin && (
+                            <button
+                              onClick={e => { e.stopPropagation(); setSettingsCol(col); setSettingsOpen(true); }}
+                              className="opacity-0 group-hover/col:opacity-100 transition-opacity ml-0.5 rounded p-0.5 hover:bg-[hsl(var(--background))]"
+                              title="Column settings"
+                            >
+                              <SlidersHorizontal className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                      </th>
+                    ))}
+                    {isAdmin && (
+                      <th className="py-1 px-1">
+                        <AddColumnButton listId={list.id} onAdded={col => setListColumns(prev => [...prev, col])} />
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -668,6 +1157,8 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
                       task={task}
                       columns={columns}
                       statuses={statuses}
+                      listColumns={listColumns}
+                      colValues={colValues[task.id] || {}}
                       onClick={() => { setSelectedTaskId(task.id); setSheetOpen(true); }}
                     />
                   ))}
@@ -742,7 +1233,30 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
         onUpdated={handleTaskUpdated}
         onDeleted={handleTaskDeleted}
         statuses={statuses}
+        listColumns={listColumns}
+        onColValuesSaved={handleColValuesSaved}
       />
+
+      {/* Column settings dialog */}
+      {settingsCol && (
+        <ColumnSettingsDialog
+          column={settingsCol}
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          onUpdated={updated => setListColumns(prev => prev.map(c => c.id === updated.id ? updated : c))}
+          onDeleted={colId => {
+            setListColumns(prev => prev.filter(c => c.id !== colId));
+            setColValues(prev => {
+              const next = { ...prev };
+              for (const taskId of Object.keys(next)) {
+                const { [colId]: _, ...rest } = next[taskId];
+                next[taskId] = rest;
+              }
+              return next;
+            });
+          }}
+        />
+      )}
 
       {/* Delete list confirmation */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -935,7 +1449,7 @@ export function ProjectDetail() {
         </Button>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-[#1a1a2e] dark:text-white truncate">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#1a1a2e] dark:text-white truncate">
               {project?.name}
             </h1>
             {project?.description && (
@@ -960,22 +1474,22 @@ export function ProjectDetail() {
             )}
           </div>
           {isAdmin && (
-            <div className="flex gap-2 shrink-0 flex-wrap">
-              <Button size="sm" variant="outline" onClick={() => { setEditCols(columns.map(c => ({ ...c }))); setColDialogOpen(true); }}>
+            <div className="flex gap-1.5 shrink-0">
+              <Button size="sm" variant="outline" title="Columns" onClick={() => { setEditCols(columns.map(c => ({ ...c }))); setColDialogOpen(true); }}>
                 <SlidersHorizontal className="h-4 w-4" />
-                Columns
+                <span className="hidden sm:inline">Columns</span>
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setStatusDialogOpen(true)}>
+              <Button size="sm" variant="outline" title="Statuses" onClick={() => setStatusDialogOpen(true)}>
                 <SlidersHorizontal className="h-4 w-4" />
-                Statuses
+                <span className="hidden sm:inline">Statuses</span>
               </Button>
-              <Button size="sm" variant="outline" onClick={() => { setInviteLink(''); setInviteOpen(true); }}>
+              <Button size="sm" variant="outline" title="Invite" onClick={() => { setInviteLink(''); setInviteOpen(true); }}>
                 <Mail className="h-4 w-4" />
-                Invite
+                <span className="hidden sm:inline">Invite</span>
               </Button>
-              <Button size="sm" onClick={() => setCreateListOpen(true)}>
+              <Button size="sm" title="New List" onClick={() => setCreateListOpen(true)}>
                 <Plus className="h-4 w-4" />
-                New List
+                <span className="hidden sm:inline">New List</span>
               </Button>
             </div>
           )}

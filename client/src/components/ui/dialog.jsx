@@ -25,7 +25,7 @@ export function DialogContent({ className, children, ...props }) {
       <DialogOverlay />
       <DialogPrimitive.Content
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg rounded-lg bg-[hsl(var(--card))] p-6 shadow-lg',
+          'fixed inset-0 z-50 bg-[hsl(var(--card))] p-6 shadow-lg overflow-y-auto sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-lg sm:rounded-lg sm:overflow-visible',
           className
         )}
         {...props}

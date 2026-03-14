@@ -3,17 +3,36 @@ const session = require('express-session');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const nodemailer = require('nodemailer');
 const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ─── File Uploads Setup ────────────────────────────────────────────────────────
+
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`);
+    },
+  }),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+});
+
 // Trust Railway's HTTPS proxy so req.secure works correctly
 app.set('trust proxy', 1);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'kuma-secret-key',
@@ -176,8 +195,10 @@ app.delete('/api/projects/:id', requireAdmin, (req, res) => {
         db.prepare('DELETE FROM comments WHERE task_id = ?').run(task.id);
         db.prepare('DELETE FROM task_assignments WHERE task_id = ?').run(task.id);
         db.prepare('DELETE FROM task_exclusions WHERE task_id = ?').run(task.id);
+        db.prepare('DELETE FROM task_column_values WHERE task_id = ?').run(task.id);
       }
       db.prepare('DELETE FROM tasks WHERE task_list_id = ?').run(list.id);
+      db.prepare('DELETE FROM list_columns WHERE task_list_id = ?').run(list.id);
     }
     db.prepare('DELETE FROM task_lists WHERE project_id = ?').run(projectId);
     db.prepare('DELETE FROM project_members WHERE project_id = ?').run(projectId);
@@ -314,12 +335,97 @@ app.delete('/api/task-lists/:id', requireAdmin, (req, res) => {
       db.prepare('DELETE FROM comments WHERE task_id = ?').run(task.id);
       db.prepare('DELETE FROM task_assignments WHERE task_id = ?').run(task.id);
       db.prepare('DELETE FROM task_exclusions WHERE task_id = ?').run(task.id);
+      db.prepare('DELETE FROM task_column_values WHERE task_id = ?').run(task.id);
     }
     db.prepare('DELETE FROM tasks WHERE task_list_id = ?').run(listId);
+    db.prepare('DELETE FROM list_columns WHERE task_list_id = ?').run(listId);
     db.prepare('DELETE FROM task_lists WHERE id = ?').run(listId);
   })();
 
   res.json({ message: 'Task list deleted' });
+});
+
+// ─── Custom Column Routes ─────────────────────────────────────────────────────
+
+const VALID_COL_TYPES = ['text', 'number', 'select', 'multi_select', 'status', 'date', 'person', 'file', 'url', 'checkbox'];
+const MAX_COL_NAME_LEN = 100;
+
+app.get('/api/task-lists/:id/columns', requireAuth, (req, res) => {
+  const listId = parseInt(req.params.id);
+  const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(listId);
+  if (!list) return res.status(404).json({ error: 'Task list not found' });
+  if (req.session.role !== 'admin') {
+    const member = db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(list.project_id, req.session.userId);
+    if (!member) return res.status(403).json({ error: 'Access denied' });
+  }
+  const cols = db.prepare('SELECT * FROM list_columns WHERE task_list_id = ? ORDER BY position ASC').all(listId);
+  res.json(cols.map(c => ({ ...c, config: JSON.parse(c.config || '{}') })));
+});
+
+app.post('/api/task-lists/:id/columns', requireAdmin, (req, res) => {
+  const listId = parseInt(req.params.id);
+  const { name, type = 'text', config = {} } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'Column name is required' });
+  if (name.trim().length > MAX_COL_NAME_LEN) return res.status(400).json({ error: `Column name must be ${MAX_COL_NAME_LEN} characters or fewer` });
+  if (!VALID_COL_TYPES.includes(type)) return res.status(400).json({ error: `Type must be one of: ${VALID_COL_TYPES.join(', ')}` });
+  const list = db.prepare('SELECT 1 FROM task_lists WHERE id = ?').get(listId);
+  if (!list) return res.status(404).json({ error: 'Task list not found' });
+  const maxPos = db.prepare('SELECT MAX(position) as m FROM list_columns WHERE task_list_id = ?').get(listId);
+  const nextPos = (maxPos?.m ?? -1) + 1;
+  const result = db.prepare('INSERT INTO list_columns (task_list_id, name, type, position, config) VALUES (?, ?, ?, ?, ?)').run(listId, name.trim(), type, nextPos, JSON.stringify(config));
+  const col = db.prepare('SELECT * FROM list_columns WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json({ ...col, config: JSON.parse(col.config) });
+});
+
+app.put('/api/task-lists/:id/columns/reorder', requireAdmin, (req, res) => {
+  const listId = parseInt(req.params.id);
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids must be an array' });
+  const list = db.prepare('SELECT 1 FROM task_lists WHERE id = ?').get(listId);
+  if (!list) return res.status(404).json({ error: 'Task list not found' });
+  const update = db.prepare('UPDATE list_columns SET position = ? WHERE id = ? AND task_list_id = ?');
+  db.transaction(() => { ids.forEach((id, i) => update.run(i, id, listId)); })();
+  const cols = db.prepare('SELECT * FROM list_columns WHERE task_list_id = ? ORDER BY position ASC').all(listId);
+  res.json(cols.map(c => ({ ...c, config: JSON.parse(c.config || '{}') })));
+});
+
+app.get('/api/task-lists/:id/column-values', requireAuth, (req, res) => {
+  const listId = parseInt(req.params.id);
+  const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(listId);
+  if (!list) return res.status(404).json({ error: 'Task list not found' });
+  if (req.session.role !== 'admin') {
+    const member = db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(list.project_id, req.session.userId);
+    if (!member) return res.status(403).json({ error: 'Access denied' });
+  }
+  const values = db.prepare(`
+    SELECT tcv.* FROM task_column_values tcv
+    JOIN tasks t ON t.id = tcv.task_id
+    WHERE t.task_list_id = ?
+  `).all(listId);
+  res.json(values.map(v => ({ ...v, value: JSON.parse(v.value) })));
+});
+
+app.put('/api/columns/:id', requireAdmin, (req, res) => {
+  const colId = parseInt(req.params.id);
+  const col = db.prepare('SELECT * FROM list_columns WHERE id = ?').get(colId);
+  if (!col) return res.status(404).json({ error: 'Column not found' });
+  const newName = (req.body.name !== undefined) ? (req.body.name.trim() || col.name) : col.name;
+  if (newName.length > MAX_COL_NAME_LEN) return res.status(400).json({ error: `Column name must be ${MAX_COL_NAME_LEN} characters or fewer` });
+  const newConfig = (req.body.config !== undefined) ? JSON.stringify(req.body.config) : col.config;
+  db.prepare('UPDATE list_columns SET name = ?, config = ? WHERE id = ?').run(newName, newConfig, colId);
+  const updated = db.prepare('SELECT * FROM list_columns WHERE id = ?').get(colId);
+  res.json({ ...updated, config: JSON.parse(updated.config) });
+});
+
+app.delete('/api/columns/:id', requireAdmin, (req, res) => {
+  const colId = parseInt(req.params.id);
+  const col = db.prepare('SELECT 1 FROM list_columns WHERE id = ?').get(colId);
+  if (!col) return res.status(404).json({ error: 'Column not found' });
+  db.transaction(() => {
+    db.prepare('DELETE FROM task_column_values WHERE column_id = ?').run(colId);
+    db.prepare('DELETE FROM list_columns WHERE id = ?').run(colId);
+  })();
+  res.json({ message: 'Column deleted' });
 });
 
 // ─── Task Routes ──────────────────────────────────────────────────────────────
@@ -434,6 +540,46 @@ app.get('/api/tasks/:id', requireAuth, (req, res) => {
   res.json({ ...task, assignments });
 });
 
+app.get('/api/tasks/:id/column-values', requireAuth, (req, res) => {
+  const taskId = parseInt(req.params.id);
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+  if (req.session.role !== 'admin') {
+    const excluded = db.prepare('SELECT 1 FROM task_exclusions WHERE task_id = ? AND user_id = ?').get(taskId, req.session.userId);
+    if (excluded) return res.status(403).json({ error: 'Access denied' });
+    const assigned = db.prepare('SELECT 1 FROM task_assignments WHERE task_id = ? AND user_id = ?').get(taskId, req.session.userId);
+    if (!assigned) return res.status(403).json({ error: 'Access denied' });
+  }
+  const values = db.prepare('SELECT * FROM task_column_values WHERE task_id = ?').all(taskId);
+  res.json(values.map(v => ({ ...v, value: JSON.parse(v.value) })));
+});
+
+app.put('/api/tasks/:id/column-values', requireAuth, (req, res) => {
+  const taskId = parseInt(req.params.id);
+  const { values } = req.body;
+  if (!Array.isArray(values)) return res.status(400).json({ error: 'values must be an array' });
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+  if (req.session.role !== 'admin') {
+    const assignment = db.prepare('SELECT * FROM task_assignments WHERE task_id = ? AND user_id = ?').get(taskId, req.session.userId);
+    if (!assignment || assignment.permission !== 'edit') return res.status(403).json({ error: 'Edit permission required' });
+  }
+  const upsert = db.prepare(`
+    INSERT INTO task_column_values (task_id, column_id, value, updated_at)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(task_id, column_id) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+  `);
+  db.transaction(() => {
+    for (const { column_id, value } of values) {
+      const col = db.prepare('SELECT 1 FROM list_columns WHERE id = ? AND task_list_id = ?').get(column_id, task.task_list_id);
+      if (!col) continue;
+      upsert.run(taskId, column_id, JSON.stringify(value));
+    }
+  })();
+  const updated = db.prepare('SELECT * FROM task_column_values WHERE task_id = ?').all(taskId);
+  res.json(updated.map(v => ({ ...v, value: JSON.parse(v.value) })));
+});
+
 app.put('/api/tasks/:id', requireAuth, (req, res) => {
   const taskId = parseInt(req.params.id);
   const { name, due_date, status } = req.body;
@@ -508,6 +654,7 @@ app.delete('/api/tasks/:id', requireAuth, (req, res) => {
     db.prepare('DELETE FROM comments WHERE task_id = ?').run(taskId);
     db.prepare('DELETE FROM task_assignments WHERE task_id = ?').run(taskId);
     db.prepare('DELETE FROM task_exclusions WHERE task_id = ?').run(taskId);
+    db.prepare('DELETE FROM task_column_values WHERE task_id = ?').run(taskId);
     db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
   })();
 
@@ -659,6 +806,81 @@ app.post('/api/tasks/:id/comments', requireAuth, (req, res) => {
   }
 
   res.status(201).json(comment);
+});
+
+app.post('/api/tasks/:id/comments/upload', requireAuth, upload.single('file'), (req, res) => {
+  const taskId = parseInt(req.params.id);
+  const { type, duration } = req.body;
+
+  if (!req.file) return res.status(400).json({ error: 'File is required' });
+
+  const allowedTypes = ['voice', 'file'];
+  if (!allowedTypes.includes(type)) return res.status(400).json({ error: 'Invalid comment type' });
+
+  if (type === 'voice') {
+    const voiceMimes = ['audio/webm', 'audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4'];
+    if (!voiceMimes.includes(req.file.mimetype)) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(400).json({ error: 'Invalid audio format' });
+    }
+  }
+
+  const task = db.prepare('SELECT name FROM tasks WHERE id = ?').get(taskId);
+  if (!task) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(404).json({ error: 'Task not found' });
+  }
+
+  if (req.session.role !== 'admin') {
+    const excluded = db.prepare('SELECT 1 FROM task_exclusions WHERE task_id = ? AND user_id = ?').get(taskId, req.session.userId);
+    if (excluded) { fs.unlink(req.file.path, () => {}); return res.status(403).json({ error: 'Access denied' }); }
+
+    const assignment = db.prepare('SELECT * FROM task_assignments WHERE task_id = ? AND user_id = ?').get(taskId, req.session.userId);
+    if (!assignment || assignment.permission !== 'edit') {
+      fs.unlink(req.file.path, () => {});
+      return res.status(403).json({ error: 'Edit permission required to comment' });
+    }
+  }
+
+  const durationVal = type === 'voice' && duration ? parseInt(duration) : null;
+  const result = db.prepare(
+    'INSERT INTO comments (task_id, user_id, content, type, file_path, file_name, file_size, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(taskId, req.session.userId, '', type, req.file.filename, req.file.originalname, req.file.size, durationVal);
+
+  const comment = db.prepare(`
+    SELECT c.*, u.username
+    FROM comments c JOIN users u ON c.user_id = u.id
+    WHERE c.id = ?
+  `).get(result.lastInsertRowid);
+
+  const otherAssignees = db.prepare(
+    'SELECT user_id FROM task_assignments WHERE task_id = ? AND user_id != ?'
+  ).all(taskId, req.session.userId);
+
+  const notifTitle = type === 'voice' ? 'New Voice Note' : 'New File Attachment';
+  const notifMsg = type === 'voice'
+    ? `${comment.username} sent a voice note on "${task.name}"`
+    : `${comment.username} attached a file to "${task.name}"`;
+
+  for (const { user_id } of otherAssignees) {
+    createNotification(user_id, 'comment', notifTitle, notifMsg, `/tasks/${taskId}`);
+  }
+
+  res.status(201).json(comment);
+});
+
+app.delete('/api/comments/:id', requireAuth, (req, res) => {
+  const commentId = parseInt(req.params.id);
+  const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(commentId);
+  if (!comment) return res.status(404).json({ error: 'Comment not found' });
+  if (comment.deleted_at) return res.status(404).json({ error: 'Comment not found' });
+
+  if (req.session.role !== 'admin' && comment.user_id !== req.session.userId) {
+    return res.status(403).json({ error: 'Not authorized to delete this comment' });
+  }
+
+  db.prepare('UPDATE comments SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(commentId);
+  res.status(204).end();
 });
 
 // ─── Profile Routes ───────────────────────────────────────────────────────────
@@ -1070,6 +1292,197 @@ app.delete('/api/projects/:id/invitations/:invId', requireAdmin, (req, res) => {
     .run(parseInt(req.params.invId), parseInt(req.params.id));
   if (result.changes === 0) return res.status(404).json({ error: 'Invitation not found or already used' });
   res.json({ message: 'Invitation cancelled' });
+});
+
+// ─── Chat Routes ──────────────────────────────────────────────────────────────
+
+// GET /api/users — list all users for starting conversations
+app.get('/api/users', requireAuth, (_req, res) => {
+  const users = db.prepare(
+    'SELECT id, username, full_name, avatar_color FROM users ORDER BY username ASC'
+  ).all();
+  res.json(users);
+});
+
+// GET /api/conversations — list current user's conversations
+app.get('/api/conversations', requireAuth, (req, res) => {
+  const userId = req.session.userId;
+  const convs = db.prepare(`
+    SELECT c.*,
+      (SELECT content FROM messages WHERE conversation_id = c.id AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1) as last_message,
+      (SELECT type FROM messages WHERE conversation_id = c.id AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1) as last_message_type,
+      (SELECT created_at FROM messages WHERE conversation_id = c.id AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1) as last_message_at,
+      (SELECT u2.username FROM messages m2 JOIN users u2 ON u2.id = m2.sender_id WHERE m2.conversation_id = c.id AND m2.deleted_at IS NULL ORDER BY m2.created_at DESC LIMIT 1) as last_sender,
+      (
+        SELECT COUNT(*) FROM messages m3
+        WHERE m3.conversation_id = c.id
+        AND m3.sender_id != ?
+        AND m3.deleted_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM json_each(m3.read_by) WHERE value = ?)
+      ) as unread_count
+    FROM conversations c
+    JOIN conversation_members cm ON cm.conversation_id = c.id AND cm.user_id = ?
+    ORDER BY COALESCE(last_message_at, c.created_at) DESC
+  `).all(userId, userId, userId);
+
+  for (const conv of convs) {
+    conv.members = db.prepare(`
+      SELECT u.id, u.username, u.full_name, u.avatar_color
+      FROM conversation_members cm JOIN users u ON u.id = cm.user_id
+      WHERE cm.conversation_id = ?
+    `).all(conv.id);
+  }
+
+  res.json(convs);
+});
+
+// POST /api/conversations — create direct or group conversation
+app.post('/api/conversations', requireAuth, (req, res) => {
+  const userId = req.session.userId;
+  const { type, name, memberIds } = req.body;
+
+  if (!['direct', 'group'].includes(type)) return res.status(400).json({ error: 'Invalid conversation type' });
+  if (!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) return res.status(400).json({ error: 'At least one member required' });
+
+  if (type === 'direct') {
+    if (memberIds.length !== 1) return res.status(400).json({ error: 'Direct conversation requires one other user' });
+    const otherId = parseInt(memberIds[0]);
+    const existing = db.prepare(`
+      SELECT c.id FROM conversations c
+      JOIN conversation_members cm1 ON cm1.conversation_id = c.id AND cm1.user_id = ?
+      JOIN conversation_members cm2 ON cm2.conversation_id = c.id AND cm2.user_id = ?
+      WHERE c.type = 'direct' LIMIT 1
+    `).get(userId, otherId);
+    if (existing) {
+      const conv = db.prepare('SELECT * FROM conversations WHERE id = ?').get(existing.id);
+      conv.members = db.prepare(`SELECT u.id, u.username, u.full_name, u.avatar_color FROM conversation_members cm JOIN users u ON u.id = cm.user_id WHERE cm.conversation_id = ?`).all(existing.id);
+      conv.unread_count = 0; conv.last_message = null; conv.last_message_at = null;
+      return res.json(conv);
+    }
+  }
+
+  if (type === 'group' && (!name || !name.trim())) return res.status(400).json({ error: 'Group name is required' });
+
+  const result = db.prepare('INSERT INTO conversations (type, name, created_by) VALUES (?, ?, ?)').run(type, name?.trim() || null, userId);
+  const convId = result.lastInsertRowid;
+
+  const insertMember = db.prepare('INSERT OR IGNORE INTO conversation_members (conversation_id, user_id) VALUES (?, ?)');
+  db.transaction(() => {
+    insertMember.run(convId, userId);
+    for (const mid of memberIds) {
+      const id = parseInt(mid);
+      if (id && id !== userId) insertMember.run(convId, id);
+    }
+  })();
+
+  const conv = db.prepare('SELECT * FROM conversations WHERE id = ?').get(convId);
+  conv.members = db.prepare(`SELECT u.id, u.username, u.full_name, u.avatar_color FROM conversation_members cm JOIN users u ON u.id = cm.user_id WHERE cm.conversation_id = ?`).all(convId);
+  conv.unread_count = 0; conv.last_message = null; conv.last_message_at = null;
+  res.status(201).json(conv);
+});
+
+// GET /api/conversations/:id/messages — paginated messages (30 per page)
+app.get('/api/conversations/:id/messages', requireAuth, (req, res) => {
+  const convId = parseInt(req.params.id);
+  const userId = req.session.userId;
+  const before = req.query.before ? parseInt(req.query.before) : null;
+
+  const member = db.prepare('SELECT 1 FROM conversation_members WHERE conversation_id = ? AND user_id = ?').get(convId, userId);
+  if (!member) return res.status(403).json({ error: 'Access denied' });
+
+  const rows = before
+    ? db.prepare(`SELECT m.*, u.username, u.full_name, u.avatar_color FROM messages m JOIN users u ON u.id = m.sender_id WHERE m.conversation_id = ? AND m.id < ? ORDER BY m.created_at DESC LIMIT 30`).all(convId, before)
+    : db.prepare(`SELECT m.*, u.username, u.full_name, u.avatar_color FROM messages m JOIN users u ON u.id = m.sender_id WHERE m.conversation_id = ? ORDER BY m.created_at DESC LIMIT 30`).all(convId);
+
+  res.json(rows.reverse());
+});
+
+// POST /api/conversations/:id/messages — send text message
+app.post('/api/conversations/:id/messages', requireAuth, (req, res) => {
+  const convId = parseInt(req.params.id);
+  const userId = req.session.userId;
+  const { content } = req.body;
+
+  if (!content || !content.trim()) return res.status(400).json({ error: 'Content is required' });
+  if (content.trim().length > MAX_COMMENT_LEN) return res.status(400).json({ error: 'Message too long' });
+
+  const member = db.prepare('SELECT 1 FROM conversation_members WHERE conversation_id = ? AND user_id = ?').get(convId, userId);
+  if (!member) return res.status(403).json({ error: 'Access denied' });
+
+  const result = db.prepare(
+    `INSERT INTO messages (conversation_id, sender_id, content, type, read_by) VALUES (?, ?, ?, 'text', json_array(?))`
+  ).run(convId, userId, content.trim(), userId);
+
+  const msg = db.prepare(`SELECT m.*, u.username, u.full_name, u.avatar_color FROM messages m JOIN users u ON u.id = m.sender_id WHERE m.id = ?`).get(result.lastInsertRowid);
+  res.status(201).json(msg);
+});
+
+// POST /api/conversations/:id/messages/upload — send voice/file message
+app.post('/api/conversations/:id/messages/upload', requireAuth, upload.single('file'), (req, res) => {
+  const convId = parseInt(req.params.id);
+  const userId = req.session.userId;
+  const { type, duration } = req.body;
+
+  if (!req.file) return res.status(400).json({ error: 'File is required' });
+  if (!['voice', 'file'].includes(type)) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'Invalid type' }); }
+
+  const member = db.prepare('SELECT 1 FROM conversation_members WHERE conversation_id = ? AND user_id = ?').get(convId, userId);
+  if (!member) { fs.unlink(req.file.path, () => {}); return res.status(403).json({ error: 'Access denied' }); }
+
+  if (type === 'voice') {
+    const voiceMimes = ['audio/webm', 'audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4'];
+    if (!voiceMimes.includes(req.file.mimetype)) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'Invalid audio format' }); }
+  }
+
+  const result = db.prepare(
+    `INSERT INTO messages (conversation_id, sender_id, content, type, file_path, file_name, file_size, duration, read_by) VALUES (?, ?, '', ?, ?, ?, ?, ?, json_array(?))`
+  ).run(convId, userId, type, req.file.filename, req.file.originalname, req.file.size, duration ? parseInt(duration) : null, userId);
+
+  const msg = db.prepare(`SELECT m.*, u.username, u.full_name, u.avatar_color FROM messages m JOIN users u ON u.id = m.sender_id WHERE m.id = ?`).get(result.lastInsertRowid);
+  res.status(201).json(msg);
+});
+
+// POST /api/conversations/:id/read — mark all messages as read
+app.post('/api/conversations/:id/read', requireAuth, (req, res) => {
+  const convId = parseInt(req.params.id);
+  const userId = req.session.userId;
+
+  const member = db.prepare('SELECT 1 FROM conversation_members WHERE conversation_id = ? AND user_id = ?').get(convId, userId);
+  if (!member) return res.status(403).json({ error: 'Access denied' });
+
+  db.prepare(`
+    UPDATE messages SET read_by = json_insert(read_by, '$[#]', ?)
+    WHERE conversation_id = ? AND sender_id != ? AND deleted_at IS NULL
+    AND NOT EXISTS (SELECT 1 FROM json_each(messages.read_by) WHERE value = ?)
+  `).run(userId, convId, userId, userId);
+
+  res.json({ ok: true });
+});
+
+// DELETE /api/messages/:id — soft delete own message
+app.delete('/api/messages/:id', requireAuth, (req, res) => {
+  const msgId = parseInt(req.params.id);
+  const msg = db.prepare('SELECT * FROM messages WHERE id = ?').get(msgId);
+  if (!msg || msg.deleted_at) return res.status(404).json({ error: 'Message not found' });
+  if (req.session.role !== 'admin' && msg.sender_id !== req.session.userId) return res.status(403).json({ error: 'Not authorized' });
+  db.prepare('UPDATE messages SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(msgId);
+  res.status(204).end();
+});
+
+// POST /api/conversations/:id/members — add member to group
+app.post('/api/conversations/:id/members', requireAuth, (req, res) => {
+  const convId = parseInt(req.params.id);
+  const { userId: newMemberId } = req.body;
+  const conv = db.prepare('SELECT * FROM conversations WHERE id = ?').get(convId);
+  if (!conv) return res.status(404).json({ error: 'Conversation not found' });
+  if (conv.type !== 'group') return res.status(400).json({ error: 'Can only add members to groups' });
+  if (req.session.role !== 'admin' && conv.created_by !== req.session.userId) return res.status(403).json({ error: 'Only the group creator can add members' });
+  try {
+    db.prepare('INSERT INTO conversation_members (conversation_id, user_id) VALUES (?, ?)').run(convId, parseInt(newMemberId));
+    res.status(201).json({ ok: true });
+  } catch {
+    res.status(409).json({ error: 'User is already a member' });
+  }
 });
 
 // ─── Admin Routes ────────────────────────────────────────────────────────────

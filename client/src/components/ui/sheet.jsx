@@ -18,7 +18,7 @@ export function SheetOverlay({ className, ...props }) {
 
 export function SheetContent({ side = 'right', className, children, ...props }) {
   const sideClasses = {
-    right: 'inset-y-0 right-0 h-full w-full max-w-[480px] border-l',
+    right: 'inset-x-0 bottom-0 w-full border-t rounded-t-xl max-h-[90vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-full sm:w-full sm:max-w-[480px] sm:border-l sm:border-t-0 sm:rounded-none sm:max-h-none',
     left: 'inset-y-0 left-0 h-full w-full max-w-[480px] border-r',
     top: 'inset-x-0 top-0 w-full border-b',
     bottom: 'inset-x-0 bottom-0 w-full border-t',
