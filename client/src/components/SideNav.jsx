@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarDays, MessageSquareText, Shield,
   ChevronRight, ChevronLeft, Menu, X, Plus, LogOut, Sun, Moon,
-  Bell, CheckCheck, UserPlus, MessageSquare, ArrowRightLeft,
+  Bell, CheckCheck, UserPlus, MessageSquare, ArrowRightLeft, FileText,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,6 +20,7 @@ import {
   DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import logo from '@/assets/logo.png';
+import { NewPageModal } from '@/components/NewPageModal';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -159,10 +160,31 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
   const isAdmin = user?.role === 'admin';
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [projects, setProjects] = useState([]);
   const [expandedProjects, setExpandedProjects] = useState(new Set());
   const [projectTaskLists, setProjectTaskLists] = useState({});
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+
+  // Pages
+  const [pages, setPages] = useState([]);
+  const [pagesExpanded, setPagesExpanded] = useState(true);
+  const [expandedPages, setExpandedPages] = useState(new Set());
+  const [newPageModal, setNewPageModal] = useState({ open: false, parentId: null, projectId: null });
+
+  useEffect(() => {
+    api.get('/api/pages').then(r => setPages(r.data)).catch(() => {});
+  }, [pathname]);
+
+  function handleCreatePage(parentId = null, projectId = null) {
+    setNewPageModal({ open: true, parentId, projectId });
+  }
+
+  function handlePageCreated(page) {
+    setPages(prev => [...prev, page]);
+    setNewPageModal({ open: false, parentId: null, projectId: null });
+    navigate(`/pages/${page.id}`);
+  }
 
   const avatarName = user?.username || '';
   const avatarColor = getAvatarColor(avatarName);
@@ -317,7 +339,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
           />
 
           {/* Notifications */}
-          <Popover>
+          <Popover open={notifOpen} onOpenChange={setNotifOpen}>
             <PopoverTrigger asChild>
               <Tip label="Notifications" show={collapsed}>
                 <button
@@ -347,14 +369,21 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
                   </Button>
                 )}
               </div>
-              <div className="max-h-80 overflow-y-auto">
+              <div className="max-h-[400px] overflow-y-auto">
                 {notifications.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">No notifications</p>
+                  <div className="flex flex-col items-center justify-center py-10 gap-2">
+                    <Bell className="h-7 w-7 text-[hsl(var(--muted-foreground))] opacity-40" />
+                    <p className="text-sm text-[hsl(var(--muted-foreground))]">No notifications yet</p>
+                  </div>
                 ) : notifications.map((n, i) => (
                   <div key={n.id}>
                     {i > 0 && <Separator />}
                     <button
-                      onClick={() => markRead(n.id)}
+                      onClick={() => {
+                        markRead(n.id);
+                        if (n.link) navigate(n.link);
+                        setNotifOpen(false);
+                      }}
                       className={`w-full px-4 py-3 text-left transition-colors hover:bg-[hsl(var(--muted))] ${!n.read ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''}`}
                     >
                       <div className="flex items-start gap-3">
@@ -371,6 +400,14 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
                     </button>
                   </div>
                 ))}
+              </div>
+              <div className="border-t">
+                <button
+                  onClick={() => { navigate('/notifications'); setNotifOpen(false); }}
+                  className="w-full py-2.5 text-center text-xs font-medium text-[#0066CC] hover:bg-[hsl(var(--muted))] transition-colors"
+                >
+                  View all notifications
+                </button>
               </div>
             </PopoverContent>
           </Popover>
@@ -469,6 +506,117 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
             })}
           </div>
 
+          {/* Divider + Pages section */}
+          <div className="my-1 border-t border-[#E5E5E5] dark:border-[#1F1F1F]" />
+
+          {!collapsed ? (
+            <div className="flex items-center justify-between px-3 pb-1 pt-2">
+              <button
+                onClick={() => setPagesExpanded(v => !v)}
+                className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF] dark:text-[#6B7280] hover:text-[#111111] dark:hover:text-[#F5F5F5] transition-colors"
+              >
+                <ChevronRight className={`h-3 w-3 transition-transform duration-150 ${pagesExpanded ? 'rotate-90' : ''}`} />
+                Pages
+              </button>
+              <button
+                onClick={() => handleCreatePage()}
+                className="rounded p-0.5 text-[#9CA3AF] transition-colors hover:bg-[#F5F5F5] hover:text-[#111111] dark:hover:bg-[#1A1A1A] dark:hover:text-[#F5F5F5]"
+                aria-label="New page"
+                title="New page"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <Tip label="New page" show>
+              <button
+                onClick={() => handleCreatePage()}
+                className="flex w-full items-center justify-center rounded-md py-2 text-[#6B7280] transition-colors hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]"
+                aria-label="New page"
+              >
+                <FileText className="h-4 w-4" />
+              </button>
+            </Tip>
+          )}
+
+          {/* Page list */}
+          {!collapsed && pagesExpanded && (
+            <div className="space-y-px">
+              {pages.filter(p => !p.parent_id).map(page => {
+                const isActive = pathname === `/pages/${page.id}`;
+                const children = pages.filter(p => p.parent_id === page.id);
+                const isExpanded = expandedPages.has(page.id);
+                return (
+                  <div key={page.id}>
+                    <div className={[
+                      'flex w-full items-center rounded-md text-sm font-medium transition-colors py-1 pl-1 pr-1 gap-0.5',
+                      isActive
+                        ? 'border-l-[3px] border-[#0066CC] bg-[#E6F0FF] text-[#0066CC] dark:bg-[#0A1628] dark:text-[#0066CC] -ml-px'
+                        : 'text-[#111111] hover:bg-[#F5F5F5] dark:text-[#F5F5F5] dark:hover:bg-[#1A1A1A]',
+                    ].join(' ')}>
+                      {/* Sub-page toggle */}
+                      <button
+                        onClick={() => setExpandedPages(prev => {
+                          const next = new Set(prev);
+                          if (next.has(page.id)) next.delete(page.id); else next.add(page.id);
+                          return next;
+                        })}
+                        className="shrink-0 rounded p-0.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                        style={{ visibility: children.length > 0 ? 'visible' : 'hidden' }}
+                      >
+                        <ChevronRight className={`h-3 w-3 transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`} />
+                      </button>
+                      <Link
+                        to={`/pages/${page.id}`}
+                        onClick={() => setMobileOpen(false)}
+                        className="flex min-w-0 flex-1 items-center gap-1.5 px-1 py-0.5"
+                      >
+                        <span className="text-sm shrink-0">{page.icon || '📄'}</span>
+                        <span className="truncate text-sm">{page.title || 'Untitled'}</span>
+                      </Link>
+                      <button
+                        onClick={() => handleCreatePage(page.id)}
+                        className="shrink-0 rounded p-0.5 opacity-0 hover:opacity-100 group-hover:opacity-100 text-[#9CA3AF] hover:bg-[#F5F5F5] hover:text-[#111111] dark:hover:bg-[#1A1A1A] dark:hover:text-[#F5F5F5] transition-all"
+                        title="Add sub-page"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    </div>
+                    {/* Sub-pages */}
+                    {isExpanded && children.length > 0 && (
+                      <div className="ml-6 mt-0.5 space-y-px border-l border-[#E5E5E5] pl-3 dark:border-[#1F1F1F]">
+                        {children.map(child => (
+                          <Link
+                            key={child.id}
+                            to={`/pages/${child.id}`}
+                            onClick={() => setMobileOpen(false)}
+                            className={[
+                              'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
+                              pathname === `/pages/${child.id}`
+                                ? 'text-[#0066CC] bg-[#E6F0FF] dark:bg-[#0A1628]'
+                                : 'text-[#6B7280] hover:bg-[#F5F5F5] hover:text-[#111111] dark:text-[#9CA3AF] dark:hover:bg-[#1A1A1A]',
+                            ].join(' ')}
+                          >
+                            <span className="text-xs shrink-0">{child.icon || '📄'}</span>
+                            <span className="truncate">{child.title || 'Untitled'}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {pages.filter(p => !p.parent_id).length === 0 && (
+                <button
+                  onClick={() => handleCreatePage()}
+                  className="w-full rounded-md px-3 py-1.5 text-left text-xs text-[#9CA3AF] hover:bg-[#F5F5F5] hover:text-[#111111] dark:hover:bg-[#1A1A1A] transition-colors"
+                >
+                  + New page
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Divider + Admin */}
           {isAdmin && (
             <>
@@ -479,12 +627,12 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
         </nav>
 
         {/* ── Bottom user section ── */}
-        <div className={`shrink-0 border-t border-[#E5E5E5] dark:border-[#1F1F1F] ${collapsed ? 'p-2' : 'p-3'} space-y-1`}>
+        <div className="shrink-0 border-t border-[#E5E5E5] dark:border-[#1F1F1F] p-2 space-y-0.5">
           {/* User row */}
           {!collapsed ? (
             <Link
               to="/profile"
-              className="flex items-center gap-2.5 rounded-md px-2 py-2 transition-colors hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]"
+              className="flex items-center gap-3 rounded-md px-4 h-10 transition-colors hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]"
               onClick={() => setMobileOpen(false)}
             >
               <Avatar name={avatarName} color={avatarColor} size="sm" />
@@ -499,7 +647,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
             <Tip label={user?.username || 'Profile'} show>
               <Link
                 to="/profile"
-                className="flex w-full items-center justify-center rounded-md p-2 transition-colors hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]"
+                className="flex w-full items-center justify-center rounded-md py-2 transition-colors hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]"
                 onClick={() => setMobileOpen(false)}
               >
                 <Avatar name={avatarName} color={avatarColor} size="sm" />
@@ -507,27 +655,49 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
             </Tip>
           )}
 
-          {/* Actions row */}
-          <div className={`flex items-center gap-1 ${collapsed ? 'flex-col' : ''}`}>
-            <Tip label={darkMode ? 'Light mode' : 'Dark mode'} show={collapsed}>
+          {/* Dark mode toggle */}
+          {!collapsed ? (
+            <button
+              onClick={onToggleDark}
+              className="flex w-full items-center gap-3 rounded-md px-4 h-10 text-sm font-medium text-[#111111] dark:text-[#F5F5F5] transition-colors hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]"
+              aria-label="Toggle theme"
+            >
+              {darkMode ? <Sun className="h-5 w-5 shrink-0 text-[#6B7280] dark:text-[#9CA3AF]" /> : <Moon className="h-5 w-5 shrink-0 text-[#6B7280] dark:text-[#9CA3AF]" />}
+              <span>{darkMode ? 'Light mode' : 'Dark mode'}</span>
+            </button>
+          ) : (
+            <Tip label={darkMode ? 'Light mode' : 'Dark mode'} show>
               <button
                 onClick={onToggleDark}
-                className="flex items-center justify-center rounded-md p-2 text-[#6B7280] transition-colors hover:bg-[#F5F5F5] hover:text-[#111111] dark:hover:bg-[#1A1A1A] dark:hover:text-[#F5F5F5]"
+                className="flex w-full items-center justify-center rounded-md py-2 text-[#6B7280] transition-colors hover:bg-[#F5F5F5] hover:text-[#111111] dark:hover:bg-[#1A1A1A] dark:hover:text-[#F5F5F5]"
                 aria-label="Toggle theme"
               >
                 {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
             </Tip>
-            <Tip label="Logout" show={collapsed}>
+          )}
+
+          {/* Logout */}
+          {!collapsed ? (
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center gap-3 rounded-md px-4 h-10 text-sm font-medium text-[#111111] dark:text-[#F5F5F5] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20 dark:hover:text-red-400"
+              aria-label="Logout"
+            >
+              <LogOut className="h-5 w-5 shrink-0 text-[#6B7280] dark:text-[#9CA3AF]" />
+              <span>Logout</span>
+            </button>
+          ) : (
+            <Tip label="Logout" show>
               <button
                 onClick={handleLogout}
-                className="flex items-center justify-center rounded-md p-2 text-[#6B7280] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20 dark:hover:text-red-400"
+                className="flex w-full items-center justify-center rounded-md py-2 text-[#6B7280] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20 dark:hover:text-red-400"
                 aria-label="Logout"
               >
                 <LogOut className="h-4 w-4" />
               </button>
             </Tip>
-          </div>
+          )}
         </div>
       </aside>
 
@@ -539,6 +709,15 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
           setProjects(prev => [project, ...prev]);
           navigate(`/projects/${project.id}`);
         }}
+      />
+
+      {/* New page modal (template picker) */}
+      <NewPageModal
+        open={newPageModal.open}
+        parentId={newPageModal.parentId}
+        projectId={newPageModal.projectId}
+        onClose={() => setNewPageModal({ open: false, parentId: null, projectId: null })}
+        onCreated={handlePageCreated}
       />
     </>
   );

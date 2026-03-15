@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api';
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState([]);
@@ -7,11 +6,14 @@ export function useNotifications() {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await api.get('/api/notifications');
-      setNotifications(res.data);
-      setUnreadCount(res.data.filter(n => !n.read).length);
-    } catch {
-      // silently ignore — user may not be logged in yet
+      const res = await fetch('/api/notifications', { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json();
+      const items = data.data || [];
+      setNotifications(items);
+      setUnreadCount(items.filter(n => !n.read).length);
+    } catch (err) {
+      console.error('Notifications error:', err);
     }
   }, []);
 
@@ -22,15 +24,23 @@ export function useNotifications() {
   }, [fetchNotifications]);
 
   async function markRead(id) {
-    await api.put(`/api/notifications/${id}/read`);
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: 1 } : n));
-    setUnreadCount(prev => Math.max(0, prev - 1));
+    try {
+      await fetch(`/api/notifications/${id}/read`, { method: 'PUT', credentials: 'include' });
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: 1 } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('markRead error:', err);
+    }
   }
 
   async function markAllRead() {
-    await api.put('/api/notifications/read-all');
-    setNotifications(prev => prev.map(n => ({ ...n, read: 1 })));
-    setUnreadCount(0);
+    try {
+      await fetch('/api/notifications/read-all', { method: 'PUT', credentials: 'include' });
+      setNotifications(prev => prev.map(n => ({ ...n, read: 1 })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('markAllRead error:', err);
+    }
   }
 
   return { notifications, unreadCount, markRead, markAllRead, refetch: fetchNotifications };

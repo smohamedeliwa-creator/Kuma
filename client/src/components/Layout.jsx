@@ -9,9 +9,7 @@ export function Layout() {
   const [darkMode, setDarkMode] = useState(
     () => localStorage.getItem('kuma-theme') === 'dark'
   );
-  const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem('kuma-sidenav-collapsed') === 'true'
-  );
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);

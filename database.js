@@ -239,6 +239,39 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_event_attendees_user ON event_attendees(user_id);
 `);
 
+// ─── Pages Tables ─────────────────────────────────────────────────────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS pages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+    parent_id INTEGER REFERENCES pages(id) ON DELETE CASCADE,
+    title TEXT NOT NULL DEFAULT 'Untitled',
+    icon TEXT DEFAULT '📄',
+    cover_url TEXT,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    position REAL NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS page_blocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+    type TEXT NOT NULL DEFAULT 'paragraph',
+    content TEXT NOT NULL DEFAULT '{}',
+    position REAL NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_pages_project ON pages(project_id);
+  CREATE INDEX IF NOT EXISTS idx_pages_parent ON pages(parent_id);
+  CREATE INDEX IF NOT EXISTS idx_page_blocks_page ON page_blocks(page_id);
+`);
+
 // ─── Share Links Table ────────────────────────────────────────────────────────
 
 db.exec(`
@@ -281,10 +314,50 @@ if (taskTableSql && taskTableSql.sql && taskTableSql.sql.includes('CHECK')) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_task_list ON tasks(task_list_id)');
 }
 
+// Seed a test notification for eng1 if they have none yet
+const eng1User = db.prepare("SELECT id FROM users WHERE username = 'eng1'").get();
+if (eng1User) {
+  const eng1NotifCount = db.prepare('SELECT COUNT(*) as c FROM notifications WHERE user_id = ?').get(eng1User.id);
+  if (eng1NotifCount.c === 0) {
+    db.prepare("INSERT INTO notifications (user_id, type, title, message, read) VALUES (?, 'info', 'Welcome to Kuma', 'You have been added to the system', 0)")
+      .run(eng1User.id);
+    console.log('[database] Inserted test notification for eng1');
+  }
+}
+
 // Add priority and description columns to tasks if missing
 const taskCols = db.pragma('table_info(tasks)').map(c => c.name);
 if (!taskCols.includes('priority')) db.exec("ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'");
 if (!taskCols.includes('description')) db.exec('ALTER TABLE tasks ADD COLUMN description TEXT');
+
+// ─── Subtasks & Activity Tables ───────────────────────────────────────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS subtasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    checked INTEGER NOT NULL DEFAULT 0,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS task_activity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    action TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_subtasks_task ON subtasks(task_id);
+  CREATE INDEX IF NOT EXISTS idx_task_activity_task ON task_activity(task_id);
+`);
 
 // Remove "Final loudness check" seed task from live DB if it exists (Fix 4)
 // Must delete child rows first to satisfy foreign key constraints

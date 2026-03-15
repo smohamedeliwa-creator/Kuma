@@ -309,6 +309,13 @@ app.post('/api/projects/:id/task-lists', requireAdmin, (req, res) => {
   res.status(201).json(list);
 });
 
+app.get('/api/task-lists/:id', requireAuth, (req, res) => {
+  const listId = parseInt(req.params.id);
+  const list = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(listId);
+  if (!list) return res.status(404).json({ error: 'Task list not found' });
+  res.json(list);
+});
+
 app.put('/api/task-lists/:id', requireAdmin, (req, res) => {
   const listId = parseInt(req.params.id);
   const { name } = req.body;
@@ -587,7 +594,7 @@ app.put('/api/tasks/:id/column-values', requireAuth, (req, res) => {
 
 app.put('/api/tasks/:id', requireAuth, (req, res) => {
   const taskId = parseInt(req.params.id);
-  const { name, due_date, status, priority, description } = req.body;
+  const { name, due_date, status, priority, description, task_list_id } = req.body;
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
   if (!task) return res.status(404).json({ error: 'Task not found' });
@@ -598,6 +605,14 @@ app.put('/api/tasks/:id', requireAuth, (req, res) => {
   }
 
   const updates = {};
+
+  if (task_list_id !== undefined) {
+    const newList = db.prepare('SELECT * FROM task_lists WHERE id = ?').get(task_list_id);
+    if (!newList) return res.status(400).json({ error: 'Task list not found' });
+    const currentList = db.prepare('SELECT project_id FROM task_lists WHERE id = ?').get(task.task_list_id);
+    if (newList.project_id !== currentList?.project_id) return res.status(400).json({ error: 'Task list belongs to a different project' });
+    updates.task_list_id = task_list_id;
+  }
   if (name !== undefined) {
     const nameErr = validateName(name, 'Task name');
     if (nameErr) return res.status(400).json({ error: nameErr });
@@ -633,6 +648,15 @@ app.put('/api/tasks/:id', requireAuth, (req, res) => {
 
   const updated = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
 
+  // Log activity for tracked field changes
+  const trackedFields = ['status', 'priority', 'due_date', 'name'];
+  for (const field of trackedFields) {
+    if (updates[field] !== undefined && String(updates[field]) !== String(task[field] ?? '')) {
+      db.prepare('INSERT INTO task_activity (task_id, user_id, action, old_value, new_value) VALUES (?, ?, ?, ?, ?)')
+        .run(taskId, req.session.userId, field, task[field] ?? null, updates[field]);
+    }
+  }
+
   // Notify assignees of status change
   if (updates.status && updates.status !== task.status) {
     const taskList2 = db.prepare('SELECT project_id FROM task_lists WHERE id = ?').get(task.task_list_id);
@@ -641,9 +665,11 @@ app.put('/api/tasks/:id', requireAuth, (req, res) => {
     const otherAssignees = db.prepare(
       'SELECT user_id FROM task_assignments WHERE task_id = ? AND user_id != ?'
     ).all(taskId, req.session.userId);
+    const projectId = taskList2 ? taskList2.project_id : null;
     for (const { user_id } of otherAssignees) {
       createNotification(user_id, 'status', 'Task Status Updated',
-        `"${task.name}" was moved to ${statusLabel}`, `/tasks/${taskId}`);
+        `"${task.name}" was moved to ${statusLabel}`, projectId ? `/projects/${projectId}` : null);
+      console.log(`[notifications] INSERT status → user_id=${user_id} task="${task.name}" status=${updates.status}`);
     }
   }
 
@@ -699,10 +725,15 @@ app.post('/api/tasks/:id/assignments', requireAdmin, (req, res) => {
 
   // Notify assigned user (if not self)
   if (userId !== req.session.userId) {
-    const task = db.prepare('SELECT name FROM tasks WHERE id = ?').get(taskId);
-    if (task) {
+    const taskWithProj = db.prepare(`
+      SELECT t.name, tl.project_id
+      FROM tasks t JOIN task_lists tl ON t.task_list_id = tl.id
+      WHERE t.id = ?
+    `).get(taskId);
+    if (taskWithProj) {
       createNotification(userId, 'assignment', 'New Task Assigned',
-        `You were assigned to "${task.name}"`, `/tasks/${taskId}`);
+        `You were assigned to "${taskWithProj.name}"`, `/projects/${taskWithProj.project_id}`);
+      console.log(`[notifications] INSERT assignment → user_id=${userId} task="${taskWithProj.name}"`);
     }
   }
 
@@ -810,14 +841,19 @@ app.post('/api/tasks/:id/comments', requireAuth, (req, res) => {
   `).get(result.lastInsertRowid);
 
   // Notify other assignees of the new comment
-  const commentTask = db.prepare('SELECT name FROM tasks WHERE id = ?').get(taskId);
-  if (commentTask) {
+  const commentTaskWithProj = db.prepare(`
+    SELECT t.name, tl.project_id
+    FROM tasks t JOIN task_lists tl ON t.task_list_id = tl.id
+    WHERE t.id = ?
+  `).get(taskId);
+  if (commentTaskWithProj) {
     const otherAssignees = db.prepare(
       'SELECT user_id FROM task_assignments WHERE task_id = ? AND user_id != ?'
     ).all(taskId, req.session.userId);
     for (const { user_id } of otherAssignees) {
       createNotification(user_id, 'comment', 'New Comment',
-        `${comment.username} commented on "${commentTask.name}"`, `/tasks/${taskId}`);
+        `${comment.username} commented on "${commentTaskWithProj.name}"`, `/projects/${commentTaskWithProj.project_id}`);
+      console.log(`[notifications] INSERT comment → user_id=${user_id} task="${commentTaskWithProj.name}"`);
     }
   }
 
@@ -878,11 +914,75 @@ app.post('/api/tasks/:id/comments/upload', requireAuth, upload.single('file'), (
     ? `${comment.username} sent a voice note on "${task.name}"`
     : `${comment.username} attached a file to "${task.name}"`;
 
+  const fileTaskProj = db.prepare(`
+    SELECT tl.project_id FROM tasks t
+    JOIN task_lists tl ON t.task_list_id = tl.id WHERE t.id = ?
+  `).get(taskId);
   for (const { user_id } of otherAssignees) {
-    createNotification(user_id, 'comment', notifTitle, notifMsg, `/tasks/${taskId}`);
+    createNotification(user_id, 'comment', notifTitle, notifMsg,
+      fileTaskProj ? `/projects/${fileTaskProj.project_id}` : null);
+    console.log(`[notifications] INSERT ${type} comment → user_id=${user_id} task="${task.name}"`);
   }
 
   res.status(201).json(comment);
+});
+
+// ─── Subtasks ─────────────────────────────────────────────────────────────────
+
+app.get('/api/tasks/:id/subtasks', requireAuth, (req, res) => {
+  const taskId = parseInt(req.params.id);
+  const task = db.prepare('SELECT 1 FROM tasks WHERE id = ?').get(taskId);
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+  const subtasks = db.prepare('SELECT * FROM subtasks WHERE task_id = ? ORDER BY position ASC, id ASC').all(taskId);
+  res.json(subtasks);
+});
+
+app.post('/api/tasks/:id/subtasks', requireAuth, (req, res) => {
+  const taskId = parseInt(req.params.id);
+  const { name } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+  const task = db.prepare('SELECT 1 FROM tasks WHERE id = ?').get(taskId);
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+  const maxPos = db.prepare('SELECT COALESCE(MAX(position), 0) as m FROM subtasks WHERE task_id = ?').get(taskId);
+  const result = db.prepare(
+    'INSERT INTO subtasks (task_id, name, checked, position, created_by) VALUES (?, ?, 0, ?, ?)'
+  ).run(taskId, name.trim(), (maxPos.m || 0) + 1, req.session.userId);
+  const subtask = db.prepare('SELECT * FROM subtasks WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json(subtask);
+});
+
+app.put('/api/subtasks/:id', requireAuth, (req, res) => {
+  const subtaskId = parseInt(req.params.id);
+  const subtask = db.prepare('SELECT * FROM subtasks WHERE id = ?').get(subtaskId);
+  if (!subtask) return res.status(404).json({ error: 'Subtask not found' });
+  const { name, checked } = req.body;
+  if (name !== undefined) db.prepare('UPDATE subtasks SET name = ? WHERE id = ?').run(name.trim(), subtaskId);
+  if (checked !== undefined) db.prepare('UPDATE subtasks SET checked = ? WHERE id = ?').run(checked ? 1 : 0, subtaskId);
+  const updated = db.prepare('SELECT * FROM subtasks WHERE id = ?').get(subtaskId);
+  res.json(updated);
+});
+
+app.delete('/api/subtasks/:id', requireAuth, (req, res) => {
+  const subtaskId = parseInt(req.params.id);
+  const subtask = db.prepare('SELECT 1 FROM subtasks WHERE id = ?').get(subtaskId);
+  if (!subtask) return res.status(404).json({ error: 'Subtask not found' });
+  db.prepare('DELETE FROM subtasks WHERE id = ?').run(subtaskId);
+  res.status(204).end();
+});
+
+// ─── Task Activity ─────────────────────────────────────────────────────────────
+
+app.get('/api/tasks/:id/activity', requireAuth, (req, res) => {
+  const taskId = parseInt(req.params.id);
+  const task = db.prepare('SELECT 1 FROM tasks WHERE id = ?').get(taskId);
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+  const activity = db.prepare(`
+    SELECT ta.*, u.username
+    FROM task_activity ta JOIN users u ON ta.user_id = u.id
+    WHERE ta.task_id = ?
+    ORDER BY ta.created_at DESC
+  `).all(taskId);
+  res.json(activity);
 });
 
 app.delete('/api/comments/:id', requireAuth, (req, res) => {
@@ -983,11 +1083,12 @@ function createNotification(userId, type, title, message, link = null) {
 }
 
 app.get('/api/notifications', requireAuth, (req, res) => {
+  console.log(`[notifications] GET userId=${req.session.userId}`);
   const notifications = db.prepare(`
     SELECT * FROM notifications WHERE user_id = ?
     ORDER BY created_at DESC LIMIT 50
   `).all(req.session.userId);
-  res.json(notifications);
+  res.json({ data: notifications });
 });
 
 app.get('/api/notifications/unread-count', requireAuth, (req, res) => {
@@ -1906,6 +2007,246 @@ app.get('/api/health', requireAuth, (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ status: 'error', db: 'disconnected', error: err.message });
+  }
+});
+
+// ─── Pages API ───────────────────────────────────────────────────────────────
+
+// List all pages accessible to the user
+app.get('/api/pages', requireAuth, (req, res) => {
+  try {
+    let rows;
+    if (req.session.role === 'admin') {
+      rows = db.prepare(`
+        SELECT p.*, u.username as created_by_name
+        FROM pages p JOIN users u ON p.created_by = u.id
+        ORDER BY p.project_id NULLS FIRST, p.position ASC, p.created_at ASC
+      `).all();
+    } else {
+      rows = db.prepare(`
+        SELECT DISTINCT p.*, u.username as created_by_name
+        FROM pages p
+        JOIN users u ON p.created_by = u.id
+        LEFT JOIN project_members pm ON pm.project_id = p.project_id AND pm.user_id = ?
+        WHERE p.project_id IS NULL OR pm.user_id = ? OR p.created_by = ?
+        ORDER BY p.project_id NULLS FIRST, p.position ASC, p.created_at ASC
+      `).all(req.session.userId, req.session.userId, req.session.userId);
+    }
+    res.json(rows);
+  } catch (err) {
+    console.error('[pages] list error:', err);
+    res.status(500).json({ error: 'Failed to load pages' });
+  }
+});
+
+// Create a new page
+app.post('/api/pages', requireAuth, (req, res) => {
+  try {
+    const { title, project_id, parent_id, icon } = req.body;
+    const safeTitle = (title && typeof title === 'string') ? title.slice(0, 300) : 'Untitled';
+    const safeIcon = (icon && typeof icon === 'string') ? icon.slice(0, 10) : '📄';
+
+    // Get max position
+    const maxPos = db.prepare(
+      'SELECT COALESCE(MAX(position), 0) as m FROM pages WHERE project_id IS ? AND parent_id IS ?'
+    ).get(project_id || null, parent_id || null);
+
+    const result = db.prepare(`
+      INSERT INTO pages (title, icon, project_id, parent_id, created_by, position)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(safeTitle, safeIcon, project_id || null, parent_id || null, req.session.userId, (maxPos.m || 0) + 1);
+
+    const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json(page);
+  } catch (err) {
+    console.error('[pages] create error:', err);
+    res.status(500).json({ error: 'Failed to create page' });
+  }
+});
+
+// Get a single page (with its blocks)
+app.get('/api/pages/:id', requireAuth, (req, res) => {
+  try {
+    const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id);
+    if (!page) return res.status(404).json({ error: 'Page not found' });
+    const blocks = db.prepare(
+      'SELECT * FROM page_blocks WHERE page_id = ? ORDER BY position ASC, id ASC'
+    ).all(page.id);
+    res.json({ ...page, blocks });
+  } catch (err) {
+    console.error('[pages] get error:', err);
+    res.status(500).json({ error: 'Failed to load page' });
+  }
+});
+
+// Update page meta (title, icon, cover_url)
+app.put('/api/pages/:id', requireAuth, (req, res) => {
+  try {
+    const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id);
+    if (!page) return res.status(404).json({ error: 'Page not found' });
+    if (req.session.role !== 'admin' && page.created_by !== req.session.userId) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    const fields = {};
+    if (req.body.title !== undefined) fields.title = String(req.body.title).slice(0, 300);
+    if (req.body.icon !== undefined) fields.icon = req.body.icon ? String(req.body.icon).slice(0, 10) : null;
+    if (req.body.cover_url !== undefined) fields.cover_url = req.body.cover_url || null;
+    if (req.body.position !== undefined) fields.position = Number(req.body.position);
+    if (req.body.parent_id !== undefined) fields.parent_id = req.body.parent_id || null;
+
+    if (Object.keys(fields).length === 0) return res.json(page);
+
+    const sets = Object.keys(fields).map(k => `${k} = ?`).join(', ');
+    const vals = [...Object.values(fields), new Date().toISOString(), page.id];
+    db.prepare(`UPDATE pages SET ${sets}, updated_at = ? WHERE id = ?`).run(...vals);
+
+    const updated = db.prepare('SELECT * FROM pages WHERE id = ?').get(page.id);
+    res.json(updated);
+  } catch (err) {
+    console.error('[pages] update error:', err);
+    res.status(500).json({ error: 'Failed to update page' });
+  }
+});
+
+// Delete a page
+app.delete('/api/pages/:id', requireAuth, (req, res) => {
+  try {
+    const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id);
+    if (!page) return res.status(404).json({ error: 'Page not found' });
+    if (req.session.role !== 'admin' && page.created_by !== req.session.userId) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    // Cascade: delete blocks and child pages handled by FK ON DELETE CASCADE
+    db.prepare('DELETE FROM pages WHERE id = ?').run(page.id);
+    res.json({ message: 'Deleted' });
+  } catch (err) {
+    console.error('[pages] delete error:', err);
+    res.status(500).json({ error: 'Failed to delete page' });
+  }
+});
+
+// Duplicate a page
+app.post('/api/pages/:id/duplicate', requireAuth, (req, res) => {
+  try {
+    const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id);
+    if (!page) return res.status(404).json({ error: 'Page not found' });
+    const blocks = db.prepare('SELECT * FROM page_blocks WHERE page_id = ? ORDER BY position ASC').all(page.id);
+
+    const newPage = db.prepare(`
+      INSERT INTO pages (title, icon, cover_url, project_id, parent_id, created_by, position)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(`${page.title} (copy)`, page.icon, page.cover_url, page.project_id, page.parent_id, req.session.userId, page.position + 0.5);
+
+    for (const b of blocks) {
+      db.prepare('INSERT INTO page_blocks (page_id, type, content, position) VALUES (?, ?, ?, ?)').run(newPage.lastInsertRowid, b.type, b.content, b.position);
+    }
+    const created = db.prepare('SELECT * FROM pages WHERE id = ?').get(newPage.lastInsertRowid);
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('[pages] duplicate error:', err);
+    res.status(500).json({ error: 'Failed to duplicate page' });
+  }
+});
+
+// ── Block routes ──────────────────────────────────────────────────────────────
+
+// Create block
+app.post('/api/pages/:pageId/blocks', requireAuth, (req, res) => {
+  try {
+    const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.pageId);
+    if (!page) return res.status(404).json({ error: 'Page not found' });
+
+    const { type, content, position } = req.body;
+    const safeType = type || 'paragraph';
+    const safeContent = typeof content === 'object' ? JSON.stringify(content) : (content || '{}');
+    const safePos = position !== undefined ? Number(position) : (
+      db.prepare('SELECT COALESCE(MAX(position), 0) + 1 as m FROM page_blocks WHERE page_id = ?').get(page.id).m
+    );
+
+    const result = db.prepare(
+      'INSERT INTO page_blocks (page_id, type, content, position) VALUES (?, ?, ?, ?)'
+    ).run(page.id, safeType, safeContent, safePos);
+
+    const block = db.prepare('SELECT * FROM page_blocks WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json({ ...block, content: JSON.parse(block.content) });
+  } catch (err) {
+    console.error('[blocks] create error:', err);
+    res.status(500).json({ error: 'Failed to create block' });
+  }
+});
+
+// Update block
+app.put('/api/pages/:pageId/blocks/:blockId', requireAuth, (req, res) => {
+  try {
+    const block = db.prepare('SELECT * FROM page_blocks WHERE id = ? AND page_id = ?').get(req.params.blockId, req.params.pageId);
+    if (!block) return res.status(404).json({ error: 'Block not found' });
+
+    const updates = {};
+    if (req.body.type !== undefined) updates.type = req.body.type;
+    if (req.body.content !== undefined) {
+      updates.content = typeof req.body.content === 'object'
+        ? JSON.stringify(req.body.content)
+        : req.body.content;
+    }
+    if (req.body.position !== undefined) updates.position = Number(req.body.position);
+
+    if (Object.keys(updates).length === 0) {
+      return res.json({ ...block, content: JSON.parse(block.content) });
+    }
+
+    const sets = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+    db.prepare(`UPDATE page_blocks SET ${sets}, updated_at = ? WHERE id = ?`)
+      .run(...Object.values(updates), new Date().toISOString(), block.id);
+
+    const updated = db.prepare('SELECT * FROM page_blocks WHERE id = ?').get(block.id);
+    res.json({ ...updated, content: JSON.parse(updated.content) });
+  } catch (err) {
+    console.error('[blocks] update error:', err);
+    res.status(500).json({ error: 'Failed to update block' });
+  }
+});
+
+// Delete block
+app.delete('/api/pages/:pageId/blocks/:blockId', requireAuth, (req, res) => {
+  try {
+    const block = db.prepare('SELECT * FROM page_blocks WHERE id = ? AND page_id = ?').get(req.params.blockId, req.params.pageId);
+    if (!block) return res.status(404).json({ error: 'Block not found' });
+    db.prepare('DELETE FROM page_blocks WHERE id = ?').run(block.id);
+    res.json({ message: 'Deleted' });
+  } catch (err) {
+    console.error('[blocks] delete error:', err);
+    res.status(500).json({ error: 'Failed to delete block' });
+  }
+});
+
+// Reorder blocks
+app.put('/api/pages/:pageId/blocks/reorder', requireAuth, (req, res) => {
+  try {
+    const { blocks } = req.body; // [{ id, position }]
+    if (!Array.isArray(blocks)) return res.status(400).json({ error: 'blocks array required' });
+    const update = db.prepare('UPDATE page_blocks SET position = ?, updated_at = ? WHERE id = ? AND page_id = ?');
+    const now = new Date().toISOString();
+    const tx = db.transaction(() => {
+      for (const b of blocks) update.run(Number(b.position), now, Number(b.id), Number(req.params.pageId));
+    });
+    tx();
+    const updated = db.prepare('SELECT * FROM page_blocks WHERE page_id = ? ORDER BY position ASC').all(req.params.pageId);
+    res.json(updated.map(b => ({ ...b, content: JSON.parse(b.content) })));
+  } catch (err) {
+    console.error('[blocks] reorder error:', err);
+    res.status(500).json({ error: 'Failed to reorder blocks' });
+  }
+});
+
+// Upload image for a page block
+app.post('/api/pages/:pageId/blocks/upload', requireAuth, upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const url = `/uploads/${req.file.filename}`;
+    res.json({ url, name: req.file.originalname, size: req.file.size });
+  } catch (err) {
+    console.error('[blocks] upload error:', err);
+    res.status(500).json({ error: 'Failed to upload file' });
   }
 });
 

@@ -6,7 +6,10 @@ import {
   UserPlus, X, SlidersHorizontal, Mic, Paperclip, Play, Pause,
   Download, FileText, Image as ImageIcon, Music2, Video, StopCircle, MoreHorizontal, Share2,
   CircleDot, Columns3, ListPlus, AlertCircle, ArrowUp, Minus, ArrowDown,
+  List, LayoutGrid, GanttChartSquare,
 } from 'lucide-react';
+import { KanbanBoard } from '@/components/KanbanBoard';
+import { GanttChart } from '@/components/GanttChart';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/useToast';
@@ -36,6 +39,7 @@ import {
   ColumnTypeIcon, ColumnCellValue, ColumnField, AddColumnButton, ColumnSettingsDialog,
 } from '@/components/CustomColumns';
 import { ShareDialog } from '@/components/ShareDialog';
+import { TaskDrawer } from '@/components/TaskDrawer';
 
 function getContrastColor(hex) {
   try {
@@ -1264,7 +1268,7 @@ const DEFAULT_COLS = [
   { column_key: 'assignees', label: 'Assigned To', visible: 1 },
 ];
 
-function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS, statuses = [], isAdmin, onDeleted, members = [] }) {
+function TaskListSection({ list: initialList, projectId, projectName = '', columns = DEFAULT_COLS, statuses = [], isAdmin, onDeleted, members = [] }) {
   const { toast } = useToast();
   const [list, setList] = useState(initialList);
   const [tasks, setTasks] = useState([]);
@@ -1644,10 +1648,12 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
         </DialogContent>
       </Dialog>
 
-      {/* Task detail sheet */}
-      <TaskSheet
+      {/* Task detail drawer */}
+      <TaskDrawer
         taskId={selectedTaskId}
         projectId={projectId}
+        projectName={projectName}
+        listName={list.name}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         isAdmin={isAdmin}
@@ -1793,6 +1799,22 @@ export function ProjectDetail() {
   const [columns, setColumns] = useState(DEFAULT_COLS);
   const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // View mode: 'list' | 'board' | 'gantt'
+  const viewStorageKey = `kuma_view_${id}`;
+  const [view, setView] = useState(() => {
+    try { return localStorage.getItem(viewStorageKey) || 'list'; } catch { return 'list'; }
+  });
+
+  function switchView(v) {
+    setView(v);
+    try { localStorage.setItem(viewStorageKey, v); } catch { /* */ }
+  }
+
+  // Shared task sheet for board/gantt views
+  const [boardSheetTaskId, setBoardSheetTaskId] = useState(null);
+  const [boardSheetOpen, setBoardSheetOpen] = useState(false);
+
   const [createListOpen, setCreateListOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [listError, setListError] = useState('');
@@ -2011,40 +2033,126 @@ export function ProjectDetail() {
                   <Mail className="h-4 w-4" />
                   <span className="hidden lg:inline">Invite</span>
                 </Button>
-                <Button size="sm" title="New List" onClick={() => setCreateListOpen(true)}>
-                  <ListPlus className="h-4 w-4" />
-                  <span className="hidden lg:inline">New List</span>
-                </Button>
+                <button
+                  onClick={() => setCreateListOpen(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md bg-white dark:bg-[#1A1A1A] border border-[#E5E5E5] dark:border-[#2E2E2E] text-[#111111] dark:text-[#F5F5F5] hover:bg-[#F5F5F5] dark:hover:bg-[#242424]"
+                >
+                  <ListPlus className="w-4 h-4" />
+                  <span>New List</span>
+                </button>
               </>
             )}
           </div>
         </div>
       </div>
 
-      {/* Task Lists */}
-      <div className="space-y-4">
-        {taskLists.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <p className="text-lg font-semibold">No task lists yet</p>
-            {isAdmin && (
-              <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-                Add your first task list above.
-              </p>
+      {/* View Switcher */}
+      <div className="flex items-center gap-0 border-b border-[hsl(var(--border))] mb-5">
+        {[
+          { key: 'list',  label: 'List',  Icon: List },
+          { key: 'board', label: 'Board', Icon: LayoutGrid },
+          { key: 'gantt', label: 'Gantt', Icon: GanttChartSquare },
+        ].map(({ key, label, Icon }) => (
+          <button
+            key={key}
+            onClick={() => switchView(key)}
+            className={[
+              'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-all duration-150',
+              'border-b-2 -mb-[2px]',
+              view === key
+                ? 'border-[#0066CC] text-[#0066CC]'
+                : 'border-transparent text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]',
+            ].join(' ')}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* View content with fade transition */}
+      <div style={{ animation: 'fadeIn 150ms ease' }}>
+        {view === 'list' && (
+          <div className="space-y-4">
+            {taskLists.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <p className="text-lg font-semibold">No task lists yet</p>
+                {isAdmin && (
+                  <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+                    Add your first task list above.
+                  </p>
+                )}
+              </div>
+            ) : (
+              taskLists.map((list) => (
+                <TaskListSection
+                  key={list.id}
+                  list={list}
+                  projectId={parseInt(id)}
+                  projectName={project?.name || ''}
+                  columns={columns}
+                  statuses={statuses}
+                  isAdmin={isAdmin}
+                  members={project?.members || []}
+                  onDeleted={(listId) => setTaskLists(prev => prev.filter(l => l.id !== listId))}
+                />
+              ))
             )}
           </div>
-        ) : (
-          taskLists.map((list) => (
-            <TaskListSection
-              key={list.id}
-              list={list}
-              projectId={parseInt(id)}
-              columns={columns}
+        )}
+
+        {view === 'board' && (
+          <>
+            <KanbanBoard
+              taskLists={taskLists}
               statuses={statuses}
               isAdmin={isAdmin}
-              members={project?.members || []}
-              onDeleted={(listId) => setTaskLists(prev => prev.filter(l => l.id !== listId))}
+              projectId={parseInt(id)}
+              onOpenTask={(taskId) => { setBoardSheetTaskId(taskId); setBoardSheetOpen(true); }}
+              onListRenamed={(updated) => setTaskLists(prev => prev.map(l => l.id === updated.id ? { ...l, name: updated.name } : l))}
+              onListDeleted={(listId) => setTaskLists(prev => prev.filter(l => l.id !== listId))}
+              onListCreated={(newList) => setTaskLists(prev => [...prev, newList])}
             />
-          ))
+            <TaskDrawer
+              taskId={boardSheetTaskId}
+              projectId={parseInt(id)}
+              projectName={project?.name || ''}
+              open={boardSheetOpen}
+              onOpenChange={setBoardSheetOpen}
+              isAdmin={isAdmin}
+              onUpdated={() => {}}
+              onDeleted={() => { setBoardSheetOpen(false); }}
+              statuses={statuses}
+              listColumns={[]}
+              onColValuesSaved={() => {}}
+              columns={columns}
+            />
+          </>
+        )}
+
+        {view === 'gantt' && (
+          <>
+            <GanttChart
+              taskLists={taskLists}
+              statuses={statuses}
+              projectId={parseInt(id)}
+              onOpenTask={(taskId) => { setBoardSheetTaskId(taskId); setBoardSheetOpen(true); }}
+            />
+            <TaskDrawer
+              taskId={boardSheetTaskId}
+              projectId={parseInt(id)}
+              projectName={project?.name || ''}
+              open={boardSheetOpen}
+              onOpenChange={setBoardSheetOpen}
+              isAdmin={isAdmin}
+              onUpdated={() => {}}
+              onDeleted={() => { setBoardSheetOpen(false); }}
+              statuses={statuses}
+              listColumns={[]}
+              onColValuesSaved={() => {}}
+              columns={columns}
+            />
+          </>
         )}
       </div>
 

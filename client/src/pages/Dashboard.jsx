@@ -238,9 +238,6 @@ export function Dashboard() {
   const [editProject, setEditProject] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [myTasks, setMyTasks] = useState([]);
-  const [myTasksLoading, setMyTasksLoading] = useState(true);
-
   const loadProjects = useCallback(async () => {
     try {
       const res = await api.get('/api/projects');
@@ -253,10 +250,6 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
-
-  useEffect(() => {
-    api.get('/api/my-tasks').then(res => setMyTasks(res.data)).catch(() => {}).finally(() => setMyTasksLoading(false));
-  }, []);
 
   function handleEdit(project) {
     setEditProject(project);
@@ -310,28 +303,6 @@ export function Dashboard() {
           </Button>
         )}
       </div>
-
-      {/* My Tasks */}
-      {(myTasksLoading || myTasks.length > 0) && (
-        <div className="mb-8">
-          <h2 className="text-base font-semibold mb-3 text-[#1a1a2e] dark:text-white">My Tasks</h2>
-          {myTasksLoading ? (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}
-            </div>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {myTasks.slice(0, 9).map(task => (
-                <MyTaskCard
-                  key={task.id}
-                  task={task}
-                  onClick={() => navigate(`/projects/${task.project_id}`)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Grid */}
       {loading ? (

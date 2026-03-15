@@ -13,6 +13,9 @@ const CalendarPage = lazy(() => import('@/pages/Calendar').then((m) => ({ defaul
 const ChatPage = lazy(() => import('@/pages/Chat').then((m) => ({ default: m.Chat })));
 const InviteAccept = lazy(() => import('@/pages/InviteAccept').then((m) => ({ default: m.InviteAccept })));
 const ShareViewPage = lazy(() => import('@/pages/ShareView').then((m) => ({ default: m.ShareView })));
+const NotificationsPage = lazy(() => import('@/pages/Notifications').then((m) => ({ default: m.Notifications })));
+const PageEditorPage = lazy(() => import('@/pages/PageEditor').then((m) => ({ default: m.PageEditor })));
+const TaskFullPagePage = lazy(() => import('@/pages/TaskFullPage').then((m) => ({ default: m.TaskFullPage })));
 
 function PageSpinner() {
   return (
@@ -39,6 +42,9 @@ export default function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/chat" element={<ChatPage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
+                <Route path="/pages/:id" element={<PageEditorPage />} />
+                <Route path="/tasks/:id" element={<TaskFullPagePage />} />
               </Route>
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
