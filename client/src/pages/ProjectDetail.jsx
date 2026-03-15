@@ -213,7 +213,7 @@ function ColumnPropRow({ col, children }) {
   );
 }
 
-function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, onDeleted, statuses = [], listColumns = [], onColValuesSaved }) {
+function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, onDeleted, statuses = [], listColumns = [], onColValuesSaved, columns = [] }) {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -566,7 +566,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
                 <div className={`lg:order-2 lg:w-[260px] lg:border-l border-[hsl(var(--border))] overflow-y-auto shrink-0 ${propertiesOpen ? 'block border-b' : 'hidden'} lg:block lg:border-b-0`}>
                   <div className="p-3 space-y-0.5">
 
-                    <PropRow icon={User} label="Assignees">
+                    <PropRow icon={User} label={columns.find(c => c.column_key === 'assignees')?.label || 'Assignees'}>
                       <div className="flex flex-wrap items-center gap-1 py-1">
                         {task?.assignments?.map(a => (
                           <span key={a.id} className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--muted))] border border-[hsl(var(--border))] px-2 py-0.5 text-xs font-medium">
@@ -608,7 +608,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
                       </div>
                     </PropRow>
 
-                    <PropRow icon={Calendar} label="Due Date">
+                    <PropRow icon={Calendar} label={columns.find(c => c.column_key === 'due_date')?.label || 'Due Date'}>
                       <div className="flex items-center gap-1 w-full">
                         <input type="date" value={dueDate} onChange={e => handleDueDateChange(e.target.value)} disabled={!canEdit}
                           className={`text-sm bg-transparent outline-none disabled:cursor-default ${!dueDate ? 'italic text-[hsl(var(--muted-foreground))]' : dueDateStatus === 'overdue' ? 'text-red-500' : 'text-[hsl(var(--foreground))]'}`}
@@ -842,27 +842,136 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
 
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, columns, statuses = [], listColumns = [], colValues = {}, onClick }) {
+function TaskRow({ task, columns, statuses = [], listColumns = [], colValues = {}, projectMembers = [], onClick, onTaskUpdated, onColValueSaved }) {
   const dueDateStatus = getDueDateStatus(task.due_date);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [dueDateOpen, setDueDateOpen] = useState(false);
+  const [colOpen, setColOpen] = useState({});
+  const [flashField, setFlashField] = useState(null);
+  const [localDueDate, setLocalDueDate] = useState(task.due_date || '');
+  const [savingField, setSavingField] = useState(null);
+  const colSaveTimeouts = useRef({});
+
+  useEffect(() => { setLocalDueDate(task.due_date || ''); }, [task.due_date]);
+
+  function flash(field) {
+    setFlashField(field);
+    setTimeout(() => setFlashField(null), 800);
+  }
+
+  async function saveStatus(newStatus) {
+    setSavingField('status');
+    try {
+      const res = await api.put(`/api/tasks/${task.id}`, { status: newStatus });
+      onTaskUpdated?.(res.data);
+      setStatusOpen(false);
+      flash('status');
+    } catch { /* silent */ } finally { setSavingField(null); }
+  }
+
+  async function saveDueDate() {
+    setSavingField('due_date');
+    try {
+      const res = await api.put(`/api/tasks/${task.id}`, { due_date: localDueDate || null });
+      onTaskUpdated?.(res.data);
+      setDueDateOpen(false);
+      flash('due_date');
+    } catch { /* silent */ } finally { setSavingField(null); }
+  }
+
+  function saveColValue(colId, value) {
+    clearTimeout(colSaveTimeouts.current[colId]);
+    colSaveTimeouts.current[colId] = setTimeout(async () => {
+      try {
+        const res = await api.put(`/api/tasks/${task.id}/column-values`, {
+          values: [{ column_id: colId, value }],
+        });
+        onColValueSaved?.(task.id, res.data);
+        flash(`col_${colId}`);
+      } catch { /* silent */ }
+    }, 300);
+  }
 
   const cells = {
-    name: <td className="py-2.5 pl-4 pr-3 text-sm font-medium">{task.name}</td>,
+    name: (
+      <td className="py-2.5 pl-4 pr-3 text-sm font-medium cursor-pointer hover:text-[#0066CC] transition-colors" onClick={onClick}>
+        {task.name}
+      </td>
+    ),
     due_date: (
-      <td className="px-3 py-2.5 text-sm text-[hsl(var(--muted-foreground))]">
-        <span className="flex items-center gap-1">
-          <Calendar className="h-3.5 w-3.5 shrink-0" />
-          {formatDate(task.due_date)}
-        </span>
+      <td
+        className={`px-3 py-2.5 text-sm transition-colors ${flashField === 'due_date' ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
+        onClick={e => e.stopPropagation()}
+      >
+        <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
+          <PopoverTrigger asChild>
+            <button className="group flex items-center gap-1 w-full rounded px-1 py-0.5 hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] cursor-pointer transition-colors text-left">
+              <Calendar className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+              <span className={task.due_date
+                ? dueDateStatus === 'overdue' ? 'text-red-500' : 'text-[hsl(var(--muted-foreground))]'
+                : 'text-[hsl(var(--muted-foreground))] italic text-xs'
+              }>
+                {formatDate(task.due_date)}
+              </span>
+              <Pencil className="h-3 w-3 ml-auto text-[hsl(var(--muted-foreground))] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-56 p-3 space-y-2">
+            <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Due Date</p>
+            <input
+              type="date"
+              value={localDueDate}
+              onChange={e => setLocalDueDate(e.target.value)}
+              className="w-full rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#0066CC]/30"
+            />
+            <div className="flex items-center justify-between gap-2">
+              {localDueDate && (
+                <button onClick={() => setLocalDueDate('')} className="text-xs text-red-500 hover:underline">Clear</button>
+              )}
+              <Button size="sm" className="ml-auto h-7 text-xs" onClick={saveDueDate} disabled={savingField === 'due_date'}>Apply</Button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </td>
     ),
     status: (
-      <td className="px-3 py-2.5">
-        <StatusBadge statusKey={task.status} statuses={statuses} />
+      <td
+        className={`px-3 py-2.5 transition-colors ${flashField === 'status' ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
+        onClick={e => e.stopPropagation()}
+      >
+        <Popover open={statusOpen} onOpenChange={setStatusOpen}>
+          <PopoverTrigger asChild>
+            <button className="group flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] cursor-pointer transition-colors">
+              <StatusBadge statusKey={task.status} statuses={statuses} />
+              <Pencil className="h-3 w-3 text-[hsl(var(--muted-foreground))] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-44 p-1">
+            {statuses.map(s => (
+              <button
+                key={s.key}
+                onClick={() => saveStatus(s.key)}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] transition-colors"
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
+                {s.label}
+                {task.status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[#0066CC]" />}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
       </td>
     ),
     assignees: (
-      <td className="px-3 py-2.5 pr-4 text-sm text-[hsl(var(--muted-foreground))]">
-        {task.assignee_names || '—'}
+      <td
+        className="group px-3 py-2.5 pr-4 text-sm text-[hsl(var(--muted-foreground))] cursor-pointer hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] transition-colors"
+        onClick={onClick}
+        title="Click to open task and manage assignees"
+      >
+        <span className="flex items-center gap-1">
+          {task.assignee_names || '—'}
+          <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+        </span>
       </td>
     ),
   };
@@ -870,20 +979,45 @@ function TaskRow({ task, columns, statuses = [], listColumns = [], colValues = {
   return (
     <tr
       className={[
-        'cursor-pointer hover:bg-[hsl(var(--muted))] transition-colors',
+        'transition-colors',
         dueDateStatus === 'overdue' ? 'border-l-2 border-l-red-500' : '',
         dueDateStatus === 'due-soon' ? 'border-l-2 border-l-yellow-500' : '',
       ].join(' ')}
-      onClick={onClick}
     >
       {columns.filter(c => c.visible).map(c => (
         <React.Fragment key={c.column_key}>{cells[c.column_key]}</React.Fragment>
       ))}
-      {listColumns.map(col => (
-        <td key={col.id} className="px-3 py-2.5 text-sm">
-          <ColumnCellValue column={col} value={colValues[col.id] ?? null} />
-        </td>
-      ))}
+      {listColumns.map(col => {
+        const isFlash = flashField === `col_${col.id}`;
+        return (
+          <td
+            key={col.id}
+            className={`px-3 py-2.5 text-sm transition-colors ${isFlash ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <Popover open={colOpen[col.id] || false} onOpenChange={v => setColOpen(prev => ({ ...prev, [col.id]: v }))}>
+              <PopoverTrigger asChild>
+                <button className="group flex items-center gap-1 w-full text-left rounded px-1 py-0.5 hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] cursor-pointer transition-colors">
+                  <span className="flex-1 min-w-0 truncate">
+                    <ColumnCellValue column={col} value={colValues[col.id] ?? null} />
+                  </span>
+                  <Pencil className="h-3 w-3 text-[hsl(var(--muted-foreground))] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-64 p-3">
+                <p className="mb-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]">{col.name}</p>
+                <ColumnField
+                  column={col}
+                  value={colValues[col.id] ?? null}
+                  onChange={val => saveColValue(col.id, val)}
+                  members={projectMembers}
+                  canEdit
+                />
+              </PopoverContent>
+            </Popover>
+          </td>
+        );
+      })}
     </tr>
   );
 }
@@ -1130,7 +1264,7 @@ const DEFAULT_COLS = [
   { column_key: 'assignees', label: 'Assigned To', visible: 1 },
 ];
 
-function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS, statuses = [], isAdmin, onDeleted }) {
+function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS, statuses = [], isAdmin, onDeleted, members = [] }) {
   const { toast } = useToast();
   const [list, setList] = useState(initialList);
   const [tasks, setTasks] = useState([]);
@@ -1442,7 +1576,10 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
                         statuses={statuses}
                         listColumns={listColumns}
                         colValues={colValues[task.id] || {}}
+                        projectMembers={members}
                         onClick={() => { setSelectedTaskId(task.id); setSheetOpen(true); }}
+                        onTaskUpdated={handleTaskUpdated}
+                        onColValueSaved={handleColValuesSaved}
                       />
                     ))}
                   </tbody>
@@ -1519,6 +1656,7 @@ function TaskListSection({ list: initialList, projectId, columns = DEFAULT_COLS,
         statuses={statuses}
         listColumns={listColumns}
         onColValuesSaved={handleColValuesSaved}
+        columns={columns}
       />
 
       {/* Column settings dialog */}
@@ -1903,6 +2041,7 @@ export function ProjectDetail() {
               columns={columns}
               statuses={statuses}
               isAdmin={isAdmin}
+              members={project?.members || []}
               onDeleted={(listId) => setTaskLists(prev => prev.filter(l => l.id !== listId))}
             />
           ))
