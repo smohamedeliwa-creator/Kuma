@@ -32,7 +32,7 @@ function getContrastColor(hex) {
 
 // ─── Person helpers ────────────────────────────────────────────────────────────
 
-const PERSON_COLORS = ['#0066CC','#7C3AED','#059669','#D97706','#DC2626','#0891B2','#8B5CF6','#EC4899'];
+const PERSON_COLORS = ['#0066CC','#1A1A2E','#059669','#D97706','#DC2626','#0891B2','#3385D6','#EC4899'];
 
 function getPersonColor(name) {
   let hash = 0;

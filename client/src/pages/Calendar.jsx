@@ -16,11 +16,11 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
-const PRESET_COLORS = ['#0066CC', '#7C3AED', '#059669', '#DC2626', '#D97706', '#0891B2'];
+const PRESET_COLORS = ['#0066CC', '#1A1A2E', '#059669', '#DC2626', '#D97706', '#0891B2'];
 const TYPE_LABELS = { event: 'Event', meeting: 'Meeting', deadline: 'Deadline' };
 const TYPE_BADGE_COLORS = {
   event: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
-  meeting: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+  meeting: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
   deadline: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
 };
 

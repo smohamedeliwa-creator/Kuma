@@ -541,7 +541,8 @@ app.get('/api/tasks/:id', requireAuth, (req, res) => {
     WHERE ta.task_id = ?
   `).all(taskId);
 
-  res.json({ ...task, assignments });
+  const creator = db.prepare('SELECT username FROM users WHERE id = ?').get(task.created_by);
+  res.json({ ...task, assignments, created_by_username: creator?.username || null });
 });
 
 app.get('/api/tasks/:id/column-values', requireAuth, (req, res) => {
@@ -586,7 +587,7 @@ app.put('/api/tasks/:id/column-values', requireAuth, (req, res) => {
 
 app.put('/api/tasks/:id', requireAuth, (req, res) => {
   const taskId = parseInt(req.params.id);
-  const { name, due_date, status, priority } = req.body;
+  const { name, due_date, status, priority, description } = req.body;
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
   if (!task) return res.status(404).json({ error: 'Task not found' });
@@ -619,6 +620,10 @@ app.put('/api/tasks/:id', requireAuth, (req, res) => {
     const PRIORITIES = ['urgent', 'high', 'normal', 'low'];
     if (!PRIORITIES.includes(priority)) return res.status(400).json({ error: 'Invalid priority' });
     updates.priority = priority;
+  }
+
+  if (description !== undefined) {
+    updates.description = description ? String(description).trim().substring(0, 5000) : null;
   }
 
   if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No fields to update' });
@@ -675,7 +680,8 @@ app.delete('/api/tasks/:id', requireAuth, (req, res) => {
 
 app.post('/api/tasks/:id/assignments', requireAdmin, (req, res) => {
   const taskId = parseInt(req.params.id);
-  const { userId, permission } = req.body;
+  const userId = parseInt(req.body.userId);
+  const { permission } = req.body;
 
   if (!userId || !permission) return res.status(400).json({ error: 'userId and permission required' });
   if (!['edit', 'view'].includes(permission)) return res.status(400).json({ error: 'Permission must be edit or view' });

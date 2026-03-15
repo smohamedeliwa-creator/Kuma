@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 
 const AVATAR_COLORS = [
-  '#0066CC', '#7C3AED', '#059669', '#DC2626',
+  '#0066CC', '#1A1A2E', '#059669', '#DC2626',
   '#D97706', '#0891B2', '#BE185D', '#65A30D',
 ];
 

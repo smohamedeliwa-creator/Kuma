@@ -5,7 +5,7 @@ import {
   Send, Calendar, User, MessageSquare, Loader2, Mail, Copy, Check,
   UserPlus, X, SlidersHorizontal, Mic, Paperclip, Play, Pause,
   Download, FileText, Image as ImageIcon, Music2, Video, StopCircle, MoreHorizontal, Share2,
-  CircleDot, Columns3, ListPlus,
+  CircleDot, Columns3, ListPlus, AlertCircle, ArrowUp, Minus, ArrowDown,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle,
+  Sheet, SheetContent,
 } from '@/components/ui/sheet';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -182,14 +182,63 @@ function FileAttachment({ fileName, filePath, fileSize }) {
 
 // ─── Task Detail Sheet ────────────────────────────────────────────────────────
 
+const PRIORITY_ICON_MAP = {
+  urgent: { icon: AlertCircle, color: '#EF4444' },
+  high:   { icon: ArrowUp,     color: '#F97316' },
+  normal: { icon: Minus,       color: '#3B82F6' },
+  low:    { icon: ArrowDown,   color: '#94A3B8' },
+};
+
+function PropRow({ icon: Icon, label, children }) {
+  return (
+    <div className="flex items-start min-h-[36px] rounded-md px-2 hover:bg-[hsl(var(--muted))] transition-colors">
+      <div className="flex items-center gap-1.5 w-[110px] shrink-0 min-h-[36px]">
+        <Icon className="h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))]" />
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))] truncate">{label}</span>
+      </div>
+      <div className="flex-1 min-h-[36px] flex items-center">{children}</div>
+    </div>
+  );
+}
+
+function ColumnPropRow({ col, children }) {
+  return (
+    <div className="flex items-start min-h-[36px] rounded-md px-2 hover:bg-[hsl(var(--muted))] transition-colors">
+      <div className="flex items-center gap-1.5 w-[110px] shrink-0 min-h-[36px]">
+        <ColumnTypeIcon type={col.type} className="h-4 w-4" />
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))] truncate">{col.name}</span>
+      </div>
+      <div className="flex-1 min-h-[36px] flex items-center">{children}</div>
+    </div>
+  );
+}
+
 function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, onDeleted, statuses = [], listColumns = [], onColValuesSaved }) {
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Core state
   const [task, setTask] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [status, setStatus] = useState('todo');
+  const [priority, setPriority] = useState('normal');
+  const [dueDate, setDueDate] = useState('');
+  const [savingField, setSavingField] = useState(null);
+
+  // UI state
+  const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const [shareTaskOpen, setShareTaskOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  // Comments
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
-  const [saving, setSaving] = useState(false);
   const [sendingComment, setSendingComment] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [deleteCommentTarget, setDeleteCommentTarget] = useState(null);
+  const [deletingComment, setDeletingComment] = useState(false);
 
   // Voice recording
   const [recording, setRecording] = useState(false);
@@ -205,30 +254,17 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
   // File attachment
   const [attachedFile, setAttachedFile] = useState(null);
 
-  // Comment delete
-  const [openMenuId, setOpenMenuId] = useState(null);
-  const [deleteCommentTarget, setDeleteCommentTarget] = useState(null);
-  const [deletingComment, setDeletingComment] = useState(false);
-
-  // Share
-  const [shareTaskOpen, setShareTaskOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [name, setName] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [status, setStatus] = useState('todo');
-  const [priority, setPriority] = useState('normal');
-  const [deleteOpen, setDeleteOpen] = useState(false);
-
-  // Assignee management
+  // Assignees
   const [projectMembers, setProjectMembers] = useState([]);
   const [addAssigneeOpen, setAddAssigneeOpen] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
   const [newPermission, setNewPermission] = useState('view');
   const [assigneeBusy, setAssigneeBusy] = useState(false);
 
-  // Custom column values
+  // Custom columns
   const [colValues, setColValues] = useState({});
-  const saveTimeouts = useRef({});
+  const saveTimeoutsRef = useRef({});
+  const colSaveTimeouts = useRef({});
 
   useEffect(() => {
     if (!open || !taskId) return;
@@ -243,6 +279,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
       const t = taskRes.data;
       setTask(t);
       setName(t.name);
+      setDescription(t.description || '');
       setDueDate(t.due_date || '');
       setStatus(t.status);
       setPriority(t.priority || 'normal');
@@ -258,6 +295,44 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
     api.get(`/api/projects/${projectId}`).then(res => setProjectMembers(res.data.members || []));
   }, [open, projectId]);
 
+  const canEdit = isAdmin || task?.assignments?.some(a => a.id === user?.id && a.permission === 'edit');
+
+  // ── Auto-save ───────────────────────────────────────────────────────────────
+  async function saveTaskField(field, value) {
+    setSavingField(field);
+    try {
+      const res = await api.put(`/api/tasks/${taskId}`, { [field]: value });
+      setTask(prev => ({ ...prev, ...res.data }));
+      onUpdated(res.data);
+      toast({ title: 'Saved ✓', variant: 'success' });
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to save', variant: 'destructive' });
+    } finally {
+      setSavingField(null);
+    }
+  }
+
+  function scheduleSave(field, value, delay = 600) {
+    clearTimeout(saveTimeoutsRef.current[field]);
+    saveTimeoutsRef.current[field] = setTimeout(() => saveTaskField(field, value), delay);
+  }
+
+  async function handleStatusChange(newStatus) {
+    setStatus(newStatus);
+    await saveTaskField('status', newStatus);
+  }
+
+  async function handlePriorityChange(newPriority) {
+    setPriority(newPriority);
+    await saveTaskField('priority', newPriority);
+  }
+
+  async function handleDueDateChange(newDate) {
+    setDueDate(newDate);
+    await saveTaskField('due_date', newDate || null);
+  }
+
+  // ── Assignees ───────────────────────────────────────────────────────────────
   async function handleAddAssignee(memberId) {
     setAssigneeBusy(true);
     try {
@@ -281,46 +356,13 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
     try {
       await api.delete(`/api/tasks/${taskId}/assignments/${memberId}`);
       setTask(prev => ({ ...prev, assignments: prev.assignments.filter(a => a.id !== memberId) }));
+      toast({ title: 'Removed', variant: 'success' });
     } catch (err) {
       toast({ title: err.response?.data?.error || 'Failed to remove', variant: 'destructive' });
     }
   }
 
-  async function handleChangePermission(memberId, permission) {
-    try {
-      await api.put(`/api/tasks/${taskId}/assignments/${memberId}`, { permission });
-      setTask(prev => ({
-        ...prev,
-        assignments: prev.assignments.map(a => a.id === memberId ? { ...a, permission } : a),
-      }));
-    } catch (err) {
-      toast({ title: err.response?.data?.error || 'Failed to update permission', variant: 'destructive' });
-    }
-  }
-
-  const canEdit = isAdmin || task?.assignments?.some(
-    (a) => a.id === user?.id && a.permission === 'edit'
-  );
-
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const res = await api.put(`/api/tasks/${taskId}`, {
-        name,
-        due_date: dueDate || null,
-        status,
-        priority,
-      });
-      setTask((prev) => ({ ...prev, ...res.data }));
-      onUpdated(res.data);
-      toast({ title: 'Task saved', variant: 'success' });
-    } catch (err) {
-      toast({ title: err.response?.data?.error || 'Failed to save', variant: 'destructive' });
-    } finally {
-      setSaving(false);
-    }
-  }
-
+  // ── Delete task ─────────────────────────────────────────────────────────────
   async function handleDelete() {
     try {
       await api.delete(`/api/tasks/${taskId}`);
@@ -332,17 +374,19 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
     }
   }
 
+  // ── Custom column values ────────────────────────────────────────────────────
   async function handleColValueChange(colId, value) {
     setColValues(prev => ({ ...prev, [colId]: value }));
-    clearTimeout(saveTimeouts.current[colId]);
-    saveTimeouts.current[colId] = setTimeout(async () => {
+    clearTimeout(colSaveTimeouts.current[colId]);
+    colSaveTimeouts.current[colId] = setTimeout(async () => {
       try {
         const res = await api.put(`/api/tasks/${taskId}/column-values`, {
           values: [{ column_id: colId, value }],
         });
         onColValuesSaved?.(taskId, res.data);
+        toast({ title: 'Saved ✓', variant: 'success' });
       } catch {
-        // silent — values still in local state
+        toast({ title: 'Failed to save', variant: 'destructive' });
       }
     }, 300);
   }
@@ -441,400 +485,310 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
     }
   }
 
+  const PriorityMeta = PRIORITY_ICON_MAP[priority] || PRIORITY_ICON_MAP.normal;
+  const PriorityIcon = PriorityMeta.icon;
+  const dueDateStatus = getDueDateStatus(dueDate);
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="w-full max-w-[480px] overflow-y-auto">
-          <SheetHeader className="flex-row items-center justify-between pr-6">
-            <SheetTitle>Task Details</SheetTitle>
-            <Button variant="ghost" size="icon" title="Share task" onClick={() => setShareTaskOpen(true)}>
-              <Share2 className="h-4 w-4" />
-            </Button>
-          </SheetHeader>
-
+        <SheetContent side="right" noClose style={{ maxWidth: '680px' }} className="flex flex-col p-0">
           {loading ? (
-            <div className="px-6 py-4 space-y-4">
-              <Skeleton className="h-9 w-full" />
-              <div className="grid grid-cols-2 gap-4">
-                <Skeleton className="h-9" />
-                <Skeleton className="h-9" />
+            <div className="p-6 space-y-4">
+              <Skeleton className="h-8 w-3/4" />
+              <Skeleton className="h-5 w-24" />
+              <div className="flex gap-4 mt-6">
+                <div className="flex-1 space-y-3">
+                  <Skeleton className="h-32 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+                <div className="w-[220px] space-y-2">
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
+                </div>
               </div>
-              <Skeleton className="h-20 w-full" />
             </div>
           ) : (
-            <div className="px-6 py-4 space-y-5 flex-1">
-              {/* Actions */}
-              {canEdit && (
-                <div className="flex items-center justify-between">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 -ml-2"
-                    onClick={() => setDeleteOpen(true)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete Task
-                  </Button>
-                  <Button size="sm" onClick={handleSave} disabled={saving}>
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                    {saving ? 'Saving…' : 'Save Changes'}
-                  </Button>
-                </div>
-              )}
-
-              {/* Task Name */}
-              <div className="space-y-1.5">
-                <Label>Task Name</Label>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  disabled={!canEdit}
-                />
-              </div>
-
-              {/* Due Date + Status */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Due Date</Label>
-                  {canEdit ? (
-                    <Input
-                      type="date"
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
-                    />
-                  ) : (
-                    <p className="flex items-center gap-1.5 text-sm py-2">
-                      <Calendar className="h-3.5 w-3.5 text-[hsl(var(--muted-foreground))]" />
-                      {formatDate(dueDate)}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Status</Label>
-                  {canEdit ? (
-                    <Select value={status} onValueChange={setStatus}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {statuses.map(s => (
-                          <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="py-2">
-                      <StatusBadge statusKey={status} statuses={statuses} />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Priority</Label>
-                <div className="flex gap-1.5 flex-wrap">
-                  {PRIORITY_OPTIONS.map(opt => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => canEdit && setPriority(opt.value)}
+            <div className="flex flex-col flex-1 overflow-hidden">
+              {/* ── Header ── */}
+              <div className="shrink-0 border-b border-[hsl(var(--border))] px-6 py-5">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <input
+                      value={name}
+                      onChange={e => { setName(e.target.value); if (canEdit) scheduleSave('name', e.target.value); }}
                       disabled={!canEdit}
-                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border transition-all"
-                      style={{
-                        backgroundColor: priority === opt.value ? opt.color + '22' : 'transparent',
-                        borderColor: priority === opt.value ? opt.color : 'hsl(var(--border))',
-                        color: priority === opt.value ? opt.color : 'hsl(var(--muted-foreground))',
-                      }}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: opt.color }} />
-                      {opt.label}
+                      placeholder="Task name"
+                      className="w-full bg-transparent text-[20px] font-bold leading-tight outline-none border-none text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] disabled:cursor-default"
+                    />
+                    <div className="mt-2.5">
+                      <Popover>
+                        <PopoverTrigger asChild disabled={!canEdit}>
+                          <button className="cursor-pointer disabled:cursor-default">
+                            <StatusBadge statusKey={status} statuses={statuses} />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="w-48 p-1">
+                          {statuses.map(s => (
+                            <button key={s.key} onClick={() => handleStatusChange(s.key)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] transition-colors">
+                              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                              {s.label}
+                              {status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[#0066CC]" />}
+                            </button>
+                          ))}
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0 pt-0.5">
+                    <button onClick={() => setShareTaskOpen(true)} title="Share task" className="flex h-8 w-8 items-center justify-center rounded-md border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors">
+                      <Share2 className="h-[18px] w-[18px]" />
                     </button>
-                  ))}
+                    <button onClick={() => onOpenChange(false)} title="Close" className="flex h-8 w-8 items-center justify-center rounded-md border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors">
+                      <X className="h-[18px] w-[18px]" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Assignees */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Assignees</Label>
-                  {isAdmin && (
-                    <Popover open={addAssigneeOpen} onOpenChange={open => { setAddAssigneeOpen(open); if (!open) { setMemberSearch(''); setNewPermission('view'); } }}>
-                      <PopoverTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
-                          <UserPlus className="mr-1 h-3.5 w-3.5" />
-                          Add
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent align="end" className="w-64 p-3 space-y-2">
-                        <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Add Assignee</p>
-                        <Input
-                          placeholder="Search members…"
-                          value={memberSearch}
-                          onChange={e => setMemberSearch(e.target.value)}
-                          className="h-8 text-sm"
-                          autoFocus
-                        />
-                        <Select value={newPermission} onValueChange={setNewPermission}>
-                          <SelectTrigger className="h-8 text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="edit">Edit</SelectItem>
-                            <SelectItem value="view">View</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <div className="max-h-40 overflow-y-auto space-y-1">
-                          {projectMembers
-                            .filter(m => !task?.assignments?.some(a => a.id === m.id))
-                            .filter(m => m.username.toLowerCase().includes(memberSearch.toLowerCase()))
-                            .map(m => (
-                              <button
-                                key={m.id}
-                                disabled={assigneeBusy}
-                                onClick={() => handleAddAssignee(m.id)}
-                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] disabled:opacity-50"
-                              >
-                                <User className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
-                                <span className="flex-1 truncate text-left">{m.username}</span>
-                                {m.role === 'admin' && <span className="text-[10px] text-[#0066CC]">admin</span>}
+              {/* ── Mobile properties toggle ── */}
+              <button
+                className="lg:hidden flex items-center gap-2 px-6 py-2.5 text-sm text-[hsl(var(--muted-foreground))] border-b border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))] transition-colors shrink-0"
+                onClick={() => setPropertiesOpen(p => !p)}
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform duration-150 ${propertiesOpen ? 'rotate-180' : ''}`} />
+                {propertiesOpen ? 'Hide Properties' : 'Show Properties'}
+              </button>
+
+              {/* ── Body: two columns ── */}
+              <div className="flex flex-1 overflow-hidden flex-col lg:flex-row">
+
+                {/* Properties panel — right on desktop, top-collapsible on mobile */}
+                <div className={`lg:order-2 lg:w-[260px] lg:border-l border-[hsl(var(--border))] overflow-y-auto shrink-0 ${propertiesOpen ? 'block border-b' : 'hidden'} lg:block lg:border-b-0`}>
+                  <div className="p-3 space-y-0.5">
+
+                    <PropRow icon={User} label="Assignees">
+                      <div className="flex flex-wrap items-center gap-1 py-1">
+                        {task?.assignments?.map(a => (
+                          <span key={a.id} className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--muted))] border border-[hsl(var(--border))] px-2 py-0.5 text-xs font-medium">
+                            {a.username}
+                            {isAdmin && <button onClick={() => handleRemoveAssignee(a.id)} className="ml-0.5 text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors"><X className="h-3 w-3" /></button>}
+                          </span>
+                        ))}
+                        {!task?.assignments?.length && <span className="text-sm italic text-[hsl(var(--muted-foreground))]">Empty</span>}
+                        {isAdmin && (
+                          <Popover open={addAssigneeOpen} onOpenChange={v => { setAddAssigneeOpen(v); if (!v) { setMemberSearch(''); setNewPermission('view'); } }}>
+                            <PopoverTrigger asChild>
+                              <button className="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[#0066CC] hover:text-[#0066CC] transition-colors">
+                                <Plus className="h-3 w-3" />
                               </button>
-                            ))}
-                          {projectMembers.filter(m => !task?.assignments?.some(a => a.id === m.id)).length === 0 && (
-                            <p className="py-2 text-center text-xs text-[hsl(var(--muted-foreground))]">All members assigned</p>
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                </div>
-
-                {task?.assignments?.length === 0 && (
-                  <p className="text-xs text-[hsl(var(--muted-foreground))]">No assignees yet.</p>
-                )}
-
-                <div className="space-y-1.5">
-                  {task?.assignments?.map((a) => (
-                    <div key={a.id} className="flex items-center gap-2 rounded-md border px-2.5 py-1.5">
-                      <User className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
-                      <span className="flex-1 truncate text-sm font-medium">{a.username}</span>
-                      {isAdmin ? (
-                        <>
-                          <Select value={a.permission} onValueChange={perm => handleChangePermission(a.id, perm)}>
-                            <SelectTrigger className="h-6 w-[72px] px-2 text-xs border-0 bg-[hsl(var(--muted))]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="edit">Edit</SelectItem>
-                              <SelectItem value="view">View</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <button
-                            onClick={() => handleRemoveAssignee(a.id)}
-                            className="rounded p-0.5 text-[hsl(var(--muted-foreground))] hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/30"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </>
-                      ) : (
-                        <Badge variant={a.permission === 'edit' ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
-                          {a.permission}
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom column properties */}
-              {listColumns.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
-                    Properties
-                  </h4>
-                  {listColumns.map(col => (
-                    <div key={col.id} className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <ColumnTypeIcon type={col.type} />
-                        {col.name}
-                      </Label>
-                      <ColumnField
-                        column={col}
-                        value={colValues[col.id] ?? null}
-                        onChange={val => handleColValueChange(col.id, val)}
-                        members={projectMembers}
-                        canEdit={canEdit}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <Separator />
-
-              {/* Comments */}
-              <div className="space-y-3">
-                <h4 className="flex items-center gap-2 text-sm font-semibold">
-                  <MessageSquare className="h-4 w-4" />
-                  Comments
-                  <span className="text-[hsl(var(--muted-foreground))] font-normal">
-                    ({comments.length})
-                  </span>
-                </h4>
-
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {comments.length === 0 ? (
-                    <p className="text-sm text-[hsl(var(--muted-foreground))] py-2">
-                      No comments yet.
-                    </p>
-                  ) : (
-                    comments.map((c) => {
-                      const isDeleted = !!c.deleted_at;
-                      const canDeleteComment = c.user_id === user?.id || isAdmin;
-                      return (
-                        <div key={c.id} className="group relative rounded-lg bg-[hsl(var(--muted))] p-3">
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <span className="text-xs font-semibold text-[#0066CC]">{c.username}</span>
-                            <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                              {new Date(c.created_at).toLocaleString(undefined, {
-                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                              })}
-                            </span>
-                            {!isDeleted && c.type === 'voice' && (
-                              <span className="text-[10px] bg-[#0066CC]/10 text-[#0066CC] rounded-full px-1.5 py-0.5 font-medium">
-                                Voice
-                              </span>
-                            )}
-                            {!isDeleted && canDeleteComment && (
-                              <div className="ml-auto">
-                                <Popover open={openMenuId === c.id} onOpenChange={(v) => setOpenMenuId(v ? c.id : null)}>
-                                  <PopoverTrigger asChild>
-                                    <button
-                                      className="flex h-6 w-6 items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]"
-                                      aria-label="Comment actions"
-                                    >
-                                      <MoreHorizontal className="h-3.5 w-3.5" />
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent align="end" className="w-32 p-1">
-                                    <button
-                                      onClick={() => { setDeleteCommentTarget(c.id); setOpenMenuId(null); }}
-                                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                      Delete
-                                    </button>
-                                  </PopoverContent>
-                                </Popover>
+                            </PopoverTrigger>
+                            <PopoverContent align="start" className="w-64 p-3 space-y-2">
+                              <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Add Assignee</p>
+                              <Input placeholder="Search members…" value={memberSearch} onChange={e => setMemberSearch(e.target.value)} className="h-8 text-sm" autoFocus />
+                              <Select value={newPermission} onValueChange={setNewPermission}>
+                                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="edit">Edit</SelectItem>
+                                  <SelectItem value="view">View</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <div className="max-h-40 overflow-y-auto space-y-1">
+                                {projectMembers.filter(m => !task?.assignments?.some(a => a.id === m.id)).filter(m => m.username.toLowerCase().includes(memberSearch.toLowerCase())).map(m => (
+                                  <button key={m.id} disabled={assigneeBusy} onClick={() => handleAddAssignee(m.id)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] disabled:opacity-50">
+                                    <User className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+                                    <span className="flex-1 truncate text-left">{m.username}</span>
+                                    {m.role === 'admin' && <span className="text-[10px] text-[#0066CC]">admin</span>}
+                                  </button>
+                                ))}
+                                {projectMembers.filter(m => !task?.assignments?.some(a => a.id === m.id)).length === 0 && <p className="py-2 text-center text-xs text-[hsl(var(--muted-foreground))]">All members assigned</p>}
                               </div>
-                            )}
-                          </div>
-                          {isDeleted ? (
-                            <p className="text-sm italic text-[hsl(var(--muted-foreground))]">This comment was deleted.</p>
-                          ) : c.type === 'voice' ? (
-                            <AudioPlayer src={`/uploads/${c.file_path}`} duration={c.duration || 0} />
-                          ) : c.type === 'file' ? (
-                            <FileAttachment fileName={c.file_name} filePath={c.file_path} fileSize={c.file_size} />
-                          ) : (
-                            <p className="text-sm leading-relaxed">{c.content}</p>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                {canEdit && (
-                  <form onSubmit={handleSend} className="space-y-2">
-                    {/* Voice preview */}
-                    {voiceUrl && !recording && (
-                      <div className="rounded-lg border border-[hsl(var(--border))] p-2 space-y-1.5">
-                        <AudioPlayer src={voiceUrl} duration={voiceDuration} />
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-[hsl(var(--muted-foreground))]">Voice note · {formatDuration(voiceDuration)}</span>
-                          <button type="button" onClick={clearVoice} className="text-xs text-red-500 hover:text-red-700">
-                            Remove
-                          </button>
-                        </div>
+                            </PopoverContent>
+                          </Popover>
+                        )}
                       </div>
+                    </PropRow>
+
+                    <PropRow icon={Calendar} label="Due Date">
+                      <div className="flex items-center gap-1 w-full">
+                        <input type="date" value={dueDate} onChange={e => handleDueDateChange(e.target.value)} disabled={!canEdit}
+                          className={`text-sm bg-transparent outline-none disabled:cursor-default ${!dueDate ? 'italic text-[hsl(var(--muted-foreground))]' : dueDateStatus === 'overdue' ? 'text-red-500' : 'text-[hsl(var(--foreground))]'}`}
+                        />
+                        {dueDate && canEdit && <button onClick={() => handleDueDateChange('')} className="text-[hsl(var(--muted-foreground))] hover:text-red-500 transition-colors"><X className="h-3.5 w-3.5" /></button>}
+                        {!dueDate && !canEdit && <span className="text-sm italic text-[hsl(var(--muted-foreground))]">Empty</span>}
+                      </div>
+                    </PropRow>
+
+                    <PropRow icon={PriorityIcon} label="Priority">
+                      <Popover>
+                        <PopoverTrigger asChild disabled={!canEdit}>
+                          <button className="flex items-center gap-1.5 text-sm disabled:cursor-default hover:bg-[hsl(var(--muted))] px-1 py-0.5 rounded transition-colors">
+                            <PriorityIcon className="h-3.5 w-3.5" style={{ color: PriorityMeta.color }} />
+                            <span className="capitalize" style={{ color: PriorityMeta.color }}>{priority}</span>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="w-40 p-1">
+                          {PRIORITY_OPTIONS.map(opt => {
+                            const PMeta = PRIORITY_ICON_MAP[opt.value];
+                            const PIco = PMeta.icon;
+                            return (
+                              <button key={opt.value} onClick={() => handlePriorityChange(opt.value)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] transition-colors">
+                                <PIco className="h-3.5 w-3.5" style={{ color: PMeta.color }} />
+                                <span>{opt.label}</span>
+                                {priority === opt.value && <Check className="ml-auto h-3.5 w-3.5 text-[#0066CC]" />}
+                              </button>
+                            );
+                          })}
+                        </PopoverContent>
+                      </Popover>
+                    </PropRow>
+
+                    <PropRow icon={User} label="Created By">
+                      <span className="text-sm text-[hsl(var(--foreground))]">{task?.created_by_username || '—'}</span>
+                    </PropRow>
+
+                    <PropRow icon={Calendar} label="Created">
+                      <span className="text-sm text-[hsl(var(--muted-foreground))]">
+                        {task?.created_at ? new Date(task.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      </span>
+                    </PropRow>
+
+                    {listColumns.length > 0 && (
+                      <>
+                        <div className="my-2 border-t border-[hsl(var(--border))]" />
+                        {listColumns.map(col => (
+                          <ColumnPropRow key={col.id} col={col}>
+                            <ColumnField column={col} value={colValues[col.id] ?? null} onChange={val => handleColValueChange(col.id, val)} members={projectMembers} canEdit={canEdit} />
+                          </ColumnPropRow>
+                        ))}
+                      </>
                     )}
 
-                    {/* File preview */}
-                    {attachedFile && (
-                      <div className="flex items-center gap-2 rounded-lg border border-[hsl(var(--border))] px-3 py-2">
-                        {React.createElement(getFileIcon(attachedFile.name), { className: 'h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))]' })}
-                        <span className="text-sm truncate flex-1">{attachedFile.name}</span>
-                        <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0">{formatFileSize(attachedFile.size)}</span>
-                        <button type="button" onClick={() => setAttachedFile(null)} className="text-[hsl(var(--muted-foreground))] hover:text-red-500">
-                          <X className="h-3.5 w-3.5" />
+                    {isAdmin && (
+                      <div className="mt-4 border-t border-[hsl(var(--border))] pt-3">
+                        <button onClick={() => setDeleteOpen(true)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors">
+                          <Trash2 className="h-4 w-4" />
+                          Delete Task
                         </button>
                       </div>
                     )}
+                  </div>
+                </div>
 
-                    {/* Text input — hidden when voice/file selected */}
-                    {!voiceBlob && !attachedFile && !recording && (
-                      <Textarea
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        placeholder="Write a comment…"
-                        rows={2}
-                        className="resize-none"
-                      />
-                    )}
+                {/* Left column: description + comments */}
+                <div className="lg:order-1 flex-1 overflow-y-auto flex flex-col min-h-0">
+                  <div className="px-6 pt-5 pb-2">
+                    <textarea
+                      value={description}
+                      onChange={e => { setDescription(e.target.value); if (canEdit) scheduleSave('description', e.target.value, 800); }}
+                      disabled={!canEdit}
+                      placeholder="Add a description..."
+                      rows={4}
+                      className="w-full bg-transparent text-sm leading-relaxed text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] outline-none border border-transparent rounded-md p-2 focus:border-[hsl(var(--border))] transition-colors resize-none min-h-[120px] disabled:cursor-default"
+                    />
+                  </div>
 
-                    {/* Recording indicator */}
-                    {recording && (
-                      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/20 px-3 py-2">
-                        <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                        <span className="text-sm text-red-600 dark:text-red-400 font-mono">{formatDuration(recordingSeconds)}</span>
-                        <span className="text-xs text-red-500">Recording…</span>
-                      </div>
-                    )}
+                  <div className="mx-6 border-t border-[hsl(var(--border))] my-2" />
 
-                    {/* Toolbar */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={recording ? stopRecording : startRecording}
-                        disabled={!!voiceBlob || !!attachedFile}
-                        className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors disabled:opacity-40 ${
-                          recording
-                            ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-950/30 dark:text-red-400'
-                            : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'
-                        }`}
-                        aria-label={recording ? 'Stop recording' : 'Record voice note'}
-                        title={recording ? 'Stop recording' : 'Record voice note'}
-                      >
-                        {recording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                      </button>
-
-                      <label
-                        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors ${(recording || !!voiceBlob) ? 'opacity-40 pointer-events-none' : ''}`}
-                        title="Attach file"
-                      >
-                        <Paperclip className="h-4 w-4" />
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          className="sr-only"
-                          onChange={handleFileSelect}
-                          disabled={recording || !!voiceBlob}
-                        />
-                      </label>
-
-                      <Button
-                        type="submit"
-                        size="sm"
-                        disabled={(!commentText.trim() && !voiceBlob && !attachedFile) || sendingComment || recording}
-                        className="ml-auto"
-                      >
-                        {sendingComment
-                          ? <Loader2 className="h-4 w-4 animate-spin" />
-                          : <Send className="h-4 w-4" />}
-                        Send
-                      </Button>
+                  <div className="px-6 pb-6 flex-1">
+                    <h4 className="flex items-center gap-2 text-sm font-semibold mb-3">
+                      <MessageSquare className="h-4 w-4" />
+                      Comments
+                      <span className="text-[hsl(var(--muted-foreground))] font-normal">({comments.length})</span>
+                    </h4>
+                    <div className="space-y-2 mb-4">
+                      {comments.length === 0 ? (
+                        <p className="text-sm text-[hsl(var(--muted-foreground))] py-2">No comments yet.</p>
+                      ) : comments.map((c) => {
+                        const isDeleted = !!c.deleted_at;
+                        const canDeleteComment = c.user_id === user?.id || isAdmin;
+                        return (
+                          <div key={c.id} className="group relative rounded-lg bg-[hsl(var(--muted))] p-3">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="text-xs font-semibold text-[#0066CC]">{c.username}</span>
+                              <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                                {new Date(c.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {!isDeleted && c.type === 'voice' && <span className="text-[10px] bg-[#0066CC]/10 text-[#0066CC] rounded-full px-1.5 py-0.5 font-medium">Voice</span>}
+                              {!isDeleted && canDeleteComment && (
+                                <div className="ml-auto">
+                                  <Popover open={openMenuId === c.id} onOpenChange={(v) => setOpenMenuId(v ? c.id : null)}>
+                                    <PopoverTrigger asChild>
+                                      <button className="flex h-6 w-6 items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]" aria-label="Comment actions">
+                                        <MoreHorizontal className="h-3.5 w-3.5" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="end" className="w-32 p-1">
+                                      <button onClick={() => { setDeleteCommentTarget(c.id); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors">
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                        Delete
+                                      </button>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
+                              )}
+                            </div>
+                            {isDeleted ? (
+                              <p className="text-sm italic text-[hsl(var(--muted-foreground))]">This comment was deleted.</p>
+                            ) : c.type === 'voice' ? (
+                              <AudioPlayer src={`/uploads/${c.file_path}`} duration={c.duration || 0} />
+                            ) : c.type === 'file' ? (
+                              <FileAttachment fileName={c.file_name} filePath={c.file_path} fileSize={c.file_size} />
+                            ) : (
+                              <p className="text-sm leading-relaxed">{c.content}</p>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  </form>
-                )}
+                    {canEdit && (
+                      <form onSubmit={handleSend} className="space-y-2">
+                        {voiceUrl && !recording && (
+                          <div className="rounded-lg border border-[hsl(var(--border))] p-2 space-y-1.5">
+                            <AudioPlayer src={voiceUrl} duration={voiceDuration} />
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-[hsl(var(--muted-foreground))]">Voice note · {formatDuration(voiceDuration)}</span>
+                              <button type="button" onClick={clearVoice} className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                            </div>
+                          </div>
+                        )}
+                        {attachedFile && (
+                          <div className="flex items-center gap-2 rounded-lg border border-[hsl(var(--border))] px-3 py-2">
+                            {React.createElement(getFileIcon(attachedFile.name), { className: 'h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))]' })}
+                            <span className="text-sm truncate flex-1">{attachedFile.name}</span>
+                            <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0">{formatFileSize(attachedFile.size)}</span>
+                            <button type="button" onClick={() => setAttachedFile(null)} className="text-[hsl(var(--muted-foreground))] hover:text-red-500"><X className="h-3.5 w-3.5" /></button>
+                          </div>
+                        )}
+                        {!voiceBlob && !attachedFile && !recording && (
+                          <Textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Write a comment…" rows={2} className="resize-none" />
+                        )}
+                        {recording && (
+                          <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/20 px-3 py-2">
+                            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                            <span className="text-sm text-red-600 dark:text-red-400 font-mono">{formatDuration(recordingSeconds)}</span>
+                            <span className="text-xs text-red-500">Recording…</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <button type="button" onClick={recording ? stopRecording : startRecording} disabled={!!voiceBlob || !!attachedFile}
+                            className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors disabled:opacity-40 ${recording ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-950/30 dark:text-red-400' : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'}`}
+                            title={recording ? 'Stop recording' : 'Record voice note'}
+                          >
+                            {recording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                          </button>
+                          <label className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors ${(recording || !!voiceBlob) ? 'opacity-40 pointer-events-none' : ''}`} title="Attach file">
+                            <Paperclip className="h-4 w-4" />
+                            <input ref={fileInputRef} type="file" className="sr-only" onChange={handleFileSelect} disabled={recording || !!voiceBlob} />
+                          </label>
+                          <Button type="submit" size="sm" disabled={(!commentText.trim() && !voiceBlob && !attachedFile) || sendingComment || recording} className="ml-auto">
+                            {sendingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                            Send
+                          </Button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -972,7 +926,7 @@ function QuickActionsMenu({ task, statuses, isAdmin, onClose, onStatusChange, on
             >
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
               {s.label}
-              {task.status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[#7C3AED]" />}
+              {task.status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[#0066CC]" />}
             </button>
           ))}
         </div>
@@ -1091,7 +1045,7 @@ function TaskCard({ task, statuses, listColumns, colValues, isAdmin, onOpen, onD
       >
         {/* Top: name + status */}
         <div className="flex items-start justify-between gap-2">
-          <p className="flex-1 text-[15px] font-semibold leading-snug">{task.name}</p>
+          <p className="flex-1 text-[15px] font-semibold leading-snug text-[#111111] dark:text-[#F5F5F5]">{task.name}</p>
           <StatusBadge statusKey={task.status} statuses={statuses} />
         </div>
 
@@ -1126,7 +1080,7 @@ function TaskCard({ task, statuses, listColumns, colValues, isAdmin, onOpen, onD
               );
             })}
             {moreCols > 0 && (
-              <span className="rounded-full bg-[hsl(var(--muted))] px-2 py-0.5 text-[11px] text-[#6B7280]">
+              <span className="rounded-full bg-[hsl(var(--muted))] px-2 py-0.5 text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">
                 +{moreCols} more
               </span>
             )}
@@ -1135,7 +1089,7 @@ function TaskCard({ task, statuses, listColumns, colValues, isAdmin, onOpen, onD
 
         {/* Footer: comment + attachment counts */}
         {hasFooter && (
-          <div className="flex items-center gap-3 border-t border-[#E5E5E5] pt-2 text-xs text-[#9CA3AF] dark:border-[#2E2E2E]">
+          <div className="flex items-center gap-3 border-t border-[#E5E5E5] pt-2 text-xs text-[#9CA3AF] dark:border-[#2E2E2E] dark:text-[#6B7280]">
             {task.comment_count > 0 && (
               <span className="flex items-center gap-1">
                 <MessageSquare className="h-3.5 w-3.5" />

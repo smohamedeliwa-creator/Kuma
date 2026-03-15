@@ -16,9 +16,9 @@ export function SheetOverlay({ className, ...props }) {
   );
 }
 
-export function SheetContent({ side = 'right', className, children, ...props }) {
+export function SheetContent({ side = 'right', className, children, noClose = false, ...props }) {
   const sideClasses = {
-    right: 'inset-x-0 bottom-0 w-full border-t rounded-t-xl max-h-[90vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-full sm:w-full sm:max-w-[480px] sm:border-l sm:border-t-0 sm:rounded-none sm:max-h-none',
+    right: 'inset-x-0 bottom-0 w-full border-t rounded-t-xl max-h-[90vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-full sm:w-full sm:border-l sm:border-t-0 sm:rounded-none sm:max-h-none',
     left: 'inset-y-0 left-0 h-full w-full max-w-[480px] border-r',
     top: 'inset-x-0 top-0 w-full border-b',
     bottom: 'inset-x-0 bottom-0 w-full border-t',
@@ -36,10 +36,12 @@ export function SheetContent({ side = 'right', className, children, ...props }) 
         {...props}
       >
         {children}
-        <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 focus:outline-none">
-          <X className="h-5 w-5" />
-          <span className="sr-only">Close</span>
-        </SheetClose>
+        {!noClose && (
+          <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 focus:outline-none">
+            <X className="h-5 w-5" />
+            <span className="sr-only">Close</span>
+          </SheetClose>
+        )}
       </DialogPrimitive.Content>
     </SheetPortal>
   );

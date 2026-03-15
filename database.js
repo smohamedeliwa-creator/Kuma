@@ -281,12 +281,18 @@ if (taskTableSql && taskTableSql.sql && taskTableSql.sql.includes('CHECK')) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_task_list ON tasks(task_list_id)');
 }
 
-// Add priority column to tasks if missing
+// Add priority and description columns to tasks if missing
 const taskCols = db.pragma('table_info(tasks)').map(c => c.name);
 if (!taskCols.includes('priority')) db.exec("ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'");
+if (!taskCols.includes('description')) db.exec('ALTER TABLE tasks ADD COLUMN description TEXT');
 
 // Remove "Final loudness check" seed task from live DB if it exists (Fix 4)
-db.prepare("DELETE FROM tasks WHERE name = 'Final loudness check'").run();
+// Must delete child rows first to satisfy foreign key constraints
+db.exec(`
+  DELETE FROM task_assignments WHERE task_id IN (SELECT id FROM tasks WHERE name = 'Final loudness check');
+  DELETE FROM comments WHERE task_id IN (SELECT id FROM tasks WHERE name = 'Final loudness check');
+  DELETE FROM tasks WHERE name = 'Final loudness check';
+`);
 
 // ─── Step 4: Seed data (only if users table is empty) ─────────────────────────
 

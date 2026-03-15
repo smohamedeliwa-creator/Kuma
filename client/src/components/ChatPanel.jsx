@@ -751,7 +751,7 @@ export function ChatPanel({ open, onClose, onUnreadChange }) {
                               <div
                                 className={`relative rounded-2xl px-3 py-2 text-sm ${
                                   isOwn
-                                    ? 'bg-[#7C3AED] text-white rounded-br-sm'
+                                    ? 'bg-[#0066CC] text-white rounded-br-sm'
                                     : 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] rounded-bl-sm'
                                 } ${isDeleted ? 'opacity-60' : ''}`}
                               >

@@ -35,7 +35,7 @@ function timeAgo(dateStr) {
 
 const NOTIF_COLORS = {
   assignment: 'bg-blue-500',
-  comment:    'bg-purple-500',
+  comment:    'bg-[#0066CC]',
   status:     'bg-green-500',
 };
 const NOTIF_ICONS = {
@@ -69,21 +69,21 @@ function NavRow({ to, icon: Icon, label, collapsed, badge, onClick, exact }) {
   const base = `relative flex items-center gap-3 rounded-md text-sm font-medium transition-colors select-none h-10
     ${collapsed ? 'justify-center px-0 w-full' : 'px-4 w-full'}
     ${isActive
-      ? 'bg-[#EDE9FE] text-[#7C3AED] dark:bg-[#1E1B2E] dark:text-[#A78BFA] border-l-[3px] border-[#7C3AED]'
+      ? 'bg-[#E6F0FF] text-[#0066CC] dark:bg-[#0A1628] dark:text-[#0066CC] border-l-[3px] border-[#0066CC]'
       : 'text-[#111111] dark:text-[#F5F5F5] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]'}
     ${isActive && !collapsed ? '-ml-px pl-[13px]' : ''}`;
 
   const inner = (
     <>
-      <Icon className="h-5 w-5 shrink-0" />
+      <Icon className={`h-5 w-5 shrink-0 ${isActive ? '' : 'text-[#6B7280] dark:text-[#9CA3AF]'}`} />
       {!collapsed && <span className="flex-1 truncate">{label}</span>}
       {badge > 0 && !collapsed && (
-        <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#7C3AED] px-1 text-[10px] font-bold text-white">
+        <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#0066CC] px-1 text-[10px] font-bold text-white">
           {badge > 9 ? '9+' : badge}
         </span>
       )}
       {badge > 0 && collapsed && (
-        <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#7C3AED]" />
+        <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#0066CC]" />
       )}
     </>
   );
@@ -229,7 +229,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
     <>
       {/* Mobile hamburger (always visible on small screens) */}
       <button
-        className="fixed left-4 top-3.5 z-40 flex h-9 w-9 items-center justify-center rounded-md border border-[#E5E5E5] bg-white shadow-sm transition-colors hover:bg-[#F5F5F5] dark:border-[#1F1F1F] dark:bg-[#111111] dark:hover:bg-[#1A1A1A] lg:hidden"
+        className="fixed left-4 top-3.5 z-40 flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#E5E5E5] bg-white shadow-sm transition-colors hover:bg-[#F5F5F5] dark:border-[#2E2E2E] dark:bg-[#1A1A1A] dark:hover:bg-[#222222] lg:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label="Open navigation"
       >
@@ -381,7 +381,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
           {/* Projects header */}
           {!collapsed ? (
             <div className="flex items-center justify-between px-3 pb-1 pt-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF]">Projects</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF] dark:text-[#6B7280]">Projects</span>
               {isAdmin && (
                 <button
                   onClick={() => setNewProjectOpen(true)}
@@ -419,7 +419,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
                         'flex w-full items-center rounded-md text-sm font-medium transition-colors',
                         collapsed ? 'justify-center py-2' : 'py-1.5 pl-1 pr-2 gap-1',
                         isActiveProject
-                          ? 'border-l-[3px] border-[#7C3AED] bg-[#EDE9FE] text-[#7C3AED] dark:bg-[#1E1B2E] dark:text-[#A78BFA]'
+                          ? 'border-l-[3px] border-[#0066CC] bg-[#E6F0FF] text-[#0066CC] dark:bg-[#0A1628] dark:text-[#0066CC]'
                           : 'text-[#111111] hover:bg-[#F5F5F5] dark:text-[#F5F5F5] dark:hover:bg-[#1A1A1A]',
                         isActiveProject && !collapsed ? '-ml-px' : '',
                       ].join(' ')}
@@ -448,7 +448,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
 
                   {/* Task lists (expanded) */}
                   {!collapsed && isExpanded && (
-                    <div className="ml-6 mt-0.5 space-y-px border-l border-[#E5E5E5] pl-3 dark:border-[#2A2A2A]">
+                    <div className="ml-6 mt-0.5 space-y-px border-l border-[#E5E5E5] pl-3 dark:border-[#1F1F1F]">
                       {taskLists.length === 0 ? (
                         <p className="py-1 text-[11px] text-[#9CA3AF]">No lists yet</p>
                       ) : taskLists.map(list => (
