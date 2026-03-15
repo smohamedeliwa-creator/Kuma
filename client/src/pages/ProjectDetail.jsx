@@ -5,6 +5,7 @@ import {
   Send, Calendar, User, MessageSquare, Loader2, Mail, Copy, Check,
   UserPlus, X, SlidersHorizontal, Mic, Paperclip, Play, Pause,
   Download, FileText, Image as ImageIcon, Music2, Video, StopCircle, MoreHorizontal, Share2,
+  CircleDot, Columns3, ListPlus,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -1902,25 +1903,25 @@ export function ProjectDetail() {
           <div className="flex gap-1.5 shrink-0">
             <Button size="sm" variant="outline" title="Share" onClick={() => setShareOpen(true)}>
               <Share2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Share</span>
+              <span className="hidden lg:inline">Share</span>
             </Button>
             {isAdmin && (
               <>
-                <Button size="sm" variant="outline" title="Columns" onClick={() => { setEditCols(columns.map(c => ({ ...c }))); setColDialogOpen(true); }}>
-                  <SlidersHorizontal className="h-4 w-4" />
-                  <span className="hidden sm:inline">Columns</span>
+                <Button size="sm" variant="outline" title="Customize Columns" onClick={() => { setEditCols(columns.map(c => ({ ...c }))); setColDialogOpen(true); }}>
+                  <Columns3 className="h-4 w-4" />
+                  <span className="hidden lg:inline">Columns</span>
                 </Button>
-                <Button size="sm" variant="outline" title="Statuses" onClick={() => setStatusDialogOpen(true)}>
-                  <SlidersHorizontal className="h-4 w-4" />
-                  <span className="hidden sm:inline">Statuses</span>
+                <Button size="sm" variant="outline" title="Manage Statuses" onClick={() => setStatusDialogOpen(true)}>
+                  <CircleDot className="h-4 w-4" />
+                  <span className="hidden lg:inline">Statuses</span>
                 </Button>
-                <Button size="sm" variant="outline" title="Invite" onClick={() => { setInviteLink(''); setInviteOpen(true); }}>
+                <Button size="sm" variant="outline" title="Invite Member" onClick={() => { setInviteLink(''); setInviteOpen(true); }}>
                   <Mail className="h-4 w-4" />
-                  <span className="hidden sm:inline">Invite</span>
+                  <span className="hidden lg:inline">Invite</span>
                 </Button>
                 <Button size="sm" title="New List" onClick={() => setCreateListOpen(true)}>
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">New List</span>
+                  <ListPlus className="h-4 w-4" />
+                  <span className="hidden lg:inline">New List</span>
                 </Button>
               </>
             )}
