@@ -1,13 +1,13 @@
 import { cn } from '@/lib/utils';
 
 const badgeVariants = {
-  default: 'bg-[#0066CC] text-white',
-  secondary: 'bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]',
-  destructive: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-  outline: 'border border-[hsl(var(--border))] text-[hsl(var(--foreground))]',
-  success: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
-  warning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
-  info: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  default: 'bg-[var(--brand-primary-light)] text-[var(--brand-primary)]',
+  secondary: 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]',
+  destructive: 'bg-[#FEE2E2] text-[#EF4444] dark:bg-red-900/40 dark:text-red-300',
+  outline: 'border border-[var(--border-color)] text-[var(--text-secondary)]',
+  success: 'bg-[#E0F7F5] text-[#1A9E96] dark:bg-teal-900/40 dark:text-teal-300',
+  warning: 'bg-[#FEF3C7] text-[#B07D00] dark:bg-yellow-900/40 dark:text-yellow-300',
+  info: 'bg-[var(--brand-primary-light)] text-[var(--brand-primary)] dark:bg-purple-900/40 dark:text-purple-300',
 };
 
 export function Badge({ className, variant = 'default', ...props }) {

@@ -54,7 +54,7 @@ function getFileIcon(fileName) {
 function getPersonColor(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  const colors = ['#0066CC', '#7C3AED', '#059669', '#DC2626', '#D97706', '#0891B2', '#9333EA', '#16A34A'];
+  const colors = ['var(--brand-primary)', '#7C3AED', '#059669', '#DC2626', '#D97706', '#0891B2', '#9333EA', '#16A34A'];
   return colors[Math.abs(hash) % colors.length];
 }
 
@@ -78,11 +78,11 @@ function AudioPlayer({ src, duration }) {
   return (
     <div className="flex items-center gap-2">
       <audio ref={audioRef} src={src} onTimeUpdate={() => setCurrent(audioRef.current?.currentTime || 0)} onEnded={() => setPlaying(false)} />
-      <button onClick={toggle} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0066CC] text-white hover:bg-[#0052A3] transition-colors shrink-0">
+      <button onClick={toggle} className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)] transition-colors shrink-0">
         {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 ml-0.5" />}
       </button>
       <div className="flex-1 h-1 bg-[hsl(var(--muted))] rounded-full overflow-hidden">
-        <div className="h-full bg-[#0066CC] rounded-full" style={{ width: total > 0 ? `${(current / total) * 100}%` : '0%' }} />
+        <div className="h-full bg-[var(--brand-primary)] rounded-full" style={{ width: total > 0 ? `${(current / total) * 100}%` : '0%' }} />
       </div>
       <span className="text-xs text-[hsl(var(--muted-foreground))] tabular-nums">{formatDuration(playing ? current : total)}</span>
     </div>
@@ -371,7 +371,7 @@ export function TaskFullPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#0066CC]" />
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--brand-primary)]" />
       </div>
     );
   }
@@ -380,7 +380,7 @@ export function TaskFullPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-[hsl(var(--muted-foreground))]">
         <p className="text-lg font-semibold">Task not found</p>
-        <button onClick={() => navigate(-1)} className="text-sm text-[#0066CC] hover:underline">Go back</button>
+        <button onClick={() => navigate(-1)} className="text-sm text-[var(--brand-primary)] hover:underline">Go back</button>
       </div>
     );
   }
@@ -395,7 +395,7 @@ export function TaskFullPage() {
         </button>
         {task.project_id && (
           <span className="text-[hsl(var(--muted-foreground))] text-sm">
-            / <Link to={`/projects/${task.project_id}`} className="hover:text-[#0066CC] transition-colors">{task.project_name || 'Project'}</Link>
+            / <Link to={`/projects/${task.project_id}`} className="hover:text-[var(--brand-primary)] transition-colors">{task.project_name || 'Project'}</Link>
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
@@ -450,7 +450,7 @@ export function TaskFullPage() {
                   <button key={s.key} onClick={() => { setStatus(s.key); saveTaskField('status', s.key); }} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] transition-colors">
                     <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                     {s.label}
-                    {status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[#0066CC]" />}
+                    {status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[var(--brand-primary)]" />}
                   </button>
                 ))}
               </PopoverContent>
@@ -508,13 +508,13 @@ export function TaskFullPage() {
                     }}
                     placeholder="Subtask name…"
                     autoFocus
-                    className="flex-1 text-sm bg-transparent outline-none border-b border-[hsl(var(--border))] focus:border-[#0066CC] py-1 transition-colors"
+                    className="flex-1 text-sm bg-transparent outline-none border-b border-[hsl(var(--border))] focus:border-[var(--brand-primary)] py-1 transition-colors"
                   />
-                  <button onClick={handleAddSubtask} className="text-[#0066CC] hover:text-[#0052A3]"><Check className="h-3.5 w-3.5" /></button>
+                  <button onClick={handleAddSubtask} className="text-[var(--brand-primary)] hover:text-[var(--brand-primary-hover)]"><Check className="h-3.5 w-3.5" /></button>
                   <button onClick={() => { setAddingSubtask(false); setNewSubtaskText(''); }} className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"><X className="h-3.5 w-3.5" /></button>
                 </div>
               ) : (
-                <button onClick={() => setAddingSubtask(true)} className="flex items-center gap-2 px-2 py-1.5 text-sm text-[hsl(var(--muted-foreground))] hover:text-[#0066CC] transition-colors">
+                <button onClick={() => setAddingSubtask(true)} className="flex items-center gap-2 px-2 py-1.5 text-sm text-[hsl(var(--muted-foreground))] hover:text-[var(--brand-primary)] transition-colors">
                   <Plus className="h-3.5 w-3.5" />
                   Add subtask
                 </button>
@@ -532,7 +532,7 @@ export function TaskFullPage() {
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                   className={[
                     'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
-                    activeTab === tab.key ? 'border-[#0066CC] text-[#0066CC]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]',
+                    activeTab === tab.key ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]' : 'border-transparent text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]',
                   ].join(' ')}
                 >
                   <tab.icon className="h-3.5 w-3.5" />
@@ -616,7 +616,7 @@ export function TaskFullPage() {
                       <textarea value={commentText} onChange={e => setCommentText(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend(e); }}
                         placeholder="Add a comment…" rows={3}
-                        className="w-full bg-transparent text-sm leading-relaxed outline-none border border-[hsl(var(--border))] rounded-md p-3 focus:border-[#0066CC] transition-colors resize-none placeholder:text-[hsl(var(--muted-foreground))]"
+                        className="w-full bg-transparent text-sm leading-relaxed outline-none border border-[hsl(var(--border))] rounded-md p-3 focus:border-[var(--brand-primary)] transition-colors resize-none placeholder:text-[hsl(var(--muted-foreground))]"
                       />
                     )}
                     <div className="flex items-center gap-1">
@@ -629,7 +629,7 @@ export function TaskFullPage() {
                         <input ref={fileInputRef} type="file" className="sr-only" onChange={e => { const f = e.target.files?.[0]; if (f) setAttachedFile(f); e.target.value = ''; }} disabled={recording || !!voiceBlob} />
                       </label>
                       <button type="submit" disabled={(!commentText.trim() && !voiceBlob && !attachedFile) || sendingComment || recording}
-                        className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#0066CC] text-white hover:bg-[#0052A3] transition-colors disabled:opacity-40">
+                        className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-40">
                         {sendingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
                       </button>
                     </div>
@@ -684,14 +684,14 @@ export function TaskFullPage() {
               {isAdmin && (
                 <Popover open={addAssigneeOpen} onOpenChange={v => { setAddAssigneeOpen(v); if (!v) { setMemberSearch(''); setNewPermission('view'); } }}>
                   <PopoverTrigger asChild>
-                    <button className="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[#0066CC] hover:text-[#0066CC] transition-colors">
+                    <button className="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors">
                       <Plus className="h-3 w-3" />
                     </button>
                   </PopoverTrigger>
                   <PopoverContent align="start" className="w-60 p-3 space-y-2">
                     <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Add Assignee</p>
                     <input placeholder="Search…" value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
-                      className="w-full h-8 px-2 text-sm border border-[hsl(var(--border))] rounded-md bg-transparent outline-none focus:border-[#0066CC]" autoFocus />
+                      className="w-full h-8 px-2 text-sm border border-[hsl(var(--border))] rounded-md bg-transparent outline-none focus:border-[var(--brand-primary)]" autoFocus />
                     <Select value={newPermission} onValueChange={setNewPermission}>
                       <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -737,7 +737,7 @@ export function TaskFullPage() {
                     <button key={key} onClick={() => { setPriority(key); saveTaskField('priority', key); }} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] transition-colors">
                       <PIco className="h-3.5 w-3.5" style={{ color: meta.color }} />
                       {meta.label}
-                      {priority === key && <Check className="ml-auto h-3 w-3 text-[#0066CC]" />}
+                      {priority === key && <Check className="ml-auto h-3 w-3 text-[var(--brand-primary)]" />}
                     </button>
                   );
                 })}

@@ -263,7 +263,7 @@ function CheckboxBlock({ block, onChange, canEdit }) {
             className={[
               'flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors',
               item.checked
-                ? 'border-[#0066CC] bg-[#0066CC]'
+                ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]'
                 : 'border-[hsl(var(--muted-foreground))]',
             ].join(' ')}
           >
@@ -364,7 +364,7 @@ function FileBlock({ block, onChange, pageId, canEdit }) {
             download={f.name}
             className="flex-1 min-w-0"
           >
-            <p className="text-sm font-medium truncate hover:text-[#0066CC] transition-colors">{f.name}</p>
+            <p className="text-sm font-medium truncate hover:text-[var(--brand-primary)] transition-colors">{f.name}</p>
             {f.size > 0 && <p className="text-xs text-[hsl(var(--muted-foreground))]">{fmtSize(f.size)}</p>}
           </a>
           {canEdit && (
@@ -381,7 +381,7 @@ function FileBlock({ block, onChange, pageId, canEdit }) {
       {canEdit && (
         <button
           onClick={() => inputRef.current?.click()}
-          className="flex items-center gap-3 rounded-lg border-2 border-dashed border-[hsl(var(--border))] px-4 py-3 w-full text-left hover:border-[#0066CC] transition-colors"
+          className="flex items-center gap-3 rounded-lg border-2 border-dashed border-[hsl(var(--border))] px-4 py-3 w-full text-left hover:border-[var(--brand-primary)] transition-colors"
           disabled={uploading}
         >
           {uploading
@@ -508,7 +508,7 @@ function TableBlock({ block, onChange, canEdit }) {
                 {/* Resize handle */}
                 {canEdit && (
                   <div
-                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[#0066CC]/40 transition-colors"
+                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-[var(--brand-primary)]/40 transition-colors"
                     onMouseDown={e => startResize(e, i)}
                   />
                 )}
@@ -518,7 +518,7 @@ function TableBlock({ block, onChange, canEdit }) {
               <th className="border border-[hsl(var(--border))] px-2 py-1 bg-[hsl(var(--muted))]">
                 <button
                   onClick={addCol}
-                  className="flex items-center gap-0.5 text-[#0066CC] hover:underline text-xs whitespace-nowrap"
+                  className="flex items-center gap-0.5 text-[var(--brand-primary)] hover:underline text-xs whitespace-nowrap"
                 >
                   <Plus className="h-3 w-3" /> Col
                 </button>
@@ -563,7 +563,7 @@ function TableBlock({ block, onChange, canEdit }) {
       {canEdit && (
         <button
           onClick={addRow}
-          className="mt-1 flex items-center gap-1 text-xs text-[#0066CC] hover:underline"
+          className="mt-1 flex items-center gap-1 text-xs text-[var(--brand-primary)] hover:underline"
         >
           <Plus className="h-3 w-3" /> Add row
         </button>
@@ -616,13 +616,13 @@ function UrlBlock({ block, onChange, canEdit }) {
   if (!editing && block.content.url) {
     return (
       <div className="flex items-center gap-3 rounded-lg border border-[hsl(var(--border))] px-4 py-3 hover:bg-[hsl(var(--muted))]/30 transition-colors group/link">
-        <LinkIcon className="h-4 w-4 text-[#0066CC] shrink-0" />
+        <LinkIcon className="h-4 w-4 text-[var(--brand-primary)] shrink-0" />
         <div className="min-w-0 flex-1">
           <a
             href={block.content.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm font-medium text-[#0066CC] hover:underline truncate block"
+            className="text-sm font-medium text-[var(--brand-primary)] hover:underline truncate block"
           >
             {block.content.label || block.content.url}
           </a>
@@ -652,19 +652,19 @@ function UrlBlock({ block, onChange, canEdit }) {
         placeholder="https://example.com"
         autoFocus
         onBlur={() => block.content.url && setEditing(false)}
-        className="w-full rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#0066CC]/30"
+        className="w-full rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/30"
       />
       <input
         value={block.content.label || ''}
         onChange={e => onChange({ ...block.content, label: e.target.value })}
         placeholder="Display text (optional)"
-        className="w-full rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#0066CC]/30"
+        className="w-full rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/30"
         onKeyDown={e => { if (e.key === 'Enter' && block.content.url) setEditing(false); }}
       />
       {block.content.url && (
         <button
           onClick={() => setEditing(false)}
-          className="text-xs text-[#0066CC] hover:underline"
+          className="text-xs text-[var(--brand-primary)] hover:underline"
         >
           Save link
         </button>
@@ -705,7 +705,7 @@ function StatusBadgeBlock({ block, onChange, canEdit }) {
             value={label}
             onChange={e => onChange({ ...block.content, label: e.target.value })}
             placeholder="Status label"
-            className="w-28 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-[#0066CC]/30"
+            className="w-28 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/30"
             autoFocus
           />
           <div className="flex items-center gap-1.5 flex-wrap">

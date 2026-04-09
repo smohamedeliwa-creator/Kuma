@@ -5,7 +5,7 @@ import {
   User, AlertCircle, ArrowUp, Minus, ArrowDown, Loader2, Send,
   Mic, Paperclip, StopCircle, Download, FileText, Image as ImageIcon,
   Music2, Video, Play, Pause, MessageSquare, Activity, ChevronDown,
-  Share2, Copy, Link,
+  Share2, Copy, Link, CircleDot, ChevronLeft,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -63,7 +63,7 @@ function isImageFile(fileName) {
 function getPersonColor(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  const colors = ['#0066CC', '#7C3AED', '#059669', '#DC2626', '#D97706', '#0891B2', '#9333EA', '#16A34A'];
+  const colors = ['var(--brand-primary)', '#7C3AED', '#059669', '#DC2626', '#D97706', '#0891B2', '#9333EA', '#16A34A'];
   return colors[Math.abs(hash) % colors.length];
 }
 
@@ -91,11 +91,11 @@ function AudioPlayer({ src, duration }) {
   return (
     <div className="flex items-center gap-2">
       <audio ref={audioRef} src={src} onTimeUpdate={() => setCurrent(audioRef.current?.currentTime || 0)} onEnded={() => setPlaying(false)} />
-      <button onClick={toggle} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0066CC] text-white hover:bg-[#0052A3] transition-colors shrink-0">
+      <button onClick={toggle} className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)] transition-colors shrink-0">
         {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 ml-0.5" />}
       </button>
       <div className="flex-1 h-1 bg-[hsl(var(--muted))] rounded-full overflow-hidden">
-        <div className="h-full bg-[#0066CC] rounded-full transition-all" style={{ width: total > 0 ? `${(current / total) * 100}%` : '0%' }} />
+        <div className="h-full bg-[var(--brand-primary)] rounded-full transition-all" style={{ width: total > 0 ? `${(current / total) * 100}%` : '0%' }} />
       </div>
       <span className="text-xs text-[hsl(var(--muted-foreground))] tabular-nums w-8 text-right">{formatDuration(playing ? current : total)}</span>
     </div>
@@ -131,6 +131,7 @@ export function TaskDrawer({
   listColumns = [],
   onColValuesSaved,
   columns = [],
+  onStatusesUpdated,
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -192,6 +193,16 @@ export function TaskDrawer({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [savingField, setSavingField] = useState(null);
   const saveTimeoutsRef = useRef({});
+
+  // Status manager mini-panel
+  const [statusMgrOpen, setStatusMgrOpen] = useState(false);
+  const [newStatusLabel, setNewStatusLabel] = useState('');
+  const [newStatusColor, setNewStatusColor] = useState('#94a3b8');
+  const [statusMgrSaving, setStatusMgrSaving] = useState(false);
+  const [localStatuses, setLocalStatuses] = useState(statuses);
+
+  // Keep localStatuses in sync with prop
+  useEffect(() => { setLocalStatuses(statuses); }, [statuses]);
 
   // Load data when drawer opens
   useEffect(() => {
@@ -371,6 +382,52 @@ export function TaskDrawer({
     }
   }
 
+  // ── Status manager ───────────────────────────────────────────────────────────
+
+  async function handleStatusMgrAdd(e) {
+    e.preventDefault();
+    if (!newStatusLabel.trim()) return;
+    setStatusMgrSaving(true);
+    try {
+      const res = await api.post(`/api/projects/${projectId}/statuses`, {
+        label: newStatusLabel.trim(),
+        color: newStatusColor,
+      });
+      const updated = [...localStatuses, res.data];
+      setLocalStatuses(updated);
+      onStatusesUpdated?.(updated);
+      setNewStatusLabel('');
+      setNewStatusColor('#94a3b8');
+      toast({ title: 'Status added', variant: 'success' });
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to add status', variant: 'destructive' });
+    } finally {
+      setStatusMgrSaving(false);
+    }
+  }
+
+  async function handleStatusMgrUpdate(statusId, label, color) {
+    try {
+      const res = await api.put(`/api/projects/${projectId}/statuses/${statusId}`, { label, color });
+      const updated = localStatuses.map(s => s.id === statusId ? res.data : s);
+      setLocalStatuses(updated);
+      onStatusesUpdated?.(updated);
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to update status', variant: 'destructive' });
+    }
+  }
+
+  async function handleStatusMgrDelete(statusId) {
+    try {
+      await api.delete(`/api/projects/${projectId}/statuses/${statusId}`);
+      const updated = localStatuses.filter(s => s.id !== statusId);
+      setLocalStatuses(updated);
+      onStatusesUpdated?.(updated);
+    } catch (err) {
+      toast({ title: err.response?.data?.error || 'Failed to delete status', variant: 'destructive' });
+    }
+  }
+
   // ── Voice recording ──────────────────────────────────────────────────────────
 
   async function startRecording() {
@@ -495,7 +552,8 @@ export function TaskDrawer({
         className={[
           'fixed right-0 top-0 z-50 h-full flex flex-col',
           'bg-[hsl(var(--background))] border-l border-[hsl(var(--border))]',
-          'shadow-2xl transition-transform duration-250 ease-out',
+          open ? 'shadow-2xl' : 'shadow-none',
+          'transition-transform duration-250 ease-out',
           // widths: full mobile, 100vw-60px tablet, 480px desktop
           'w-full sm:w-[calc(100vw-60px)] lg:w-[480px]',
           open ? 'translate-x-0' : 'translate-x-full',
@@ -513,6 +571,76 @@ export function TaskDrawer({
           </div>
         ) : (
           <>
+            {/* ── Status Manager Overlay ── */}
+            {statusMgrOpen && (
+              <div className="absolute inset-0 z-10 flex flex-col bg-[hsl(var(--background))]">
+                {/* Header */}
+                <div className="shrink-0 border-b border-[hsl(var(--border))] px-4 py-3 flex items-center gap-3">
+                  <button
+                    onClick={() => setStatusMgrOpen(false)}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <h3 className="text-sm font-semibold">Manage Statuses</h3>
+                </div>
+                {/* Status list */}
+                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+                  {localStatuses.map(s => (
+                    <div key={s.id} className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={s.color}
+                        onChange={e => handleStatusMgrUpdate(s.id, s.label, e.target.value)}
+                        className="h-7 w-7 cursor-pointer rounded border-0 bg-transparent p-0 shrink-0"
+                        title="Pick color"
+                      />
+                      <input
+                        value={s.label}
+                        onChange={e => setLocalStatuses(prev => prev.map(x => x.id === s.id ? { ...x, label: e.target.value } : x))}
+                        onBlur={e => handleStatusMgrUpdate(s.id, e.target.value, s.color)}
+                        className="flex-1 h-8 px-2 text-sm border border-[hsl(var(--border))] rounded-md bg-transparent outline-none focus:border-[var(--brand-primary)]"
+                      />
+                      <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0 min-w-[40px]">{s.key}</span>
+                      <button
+                        onClick={() => handleStatusMgrDelete(s.id)}
+                        className="rounded p-1 text-[hsl(var(--muted-foreground))] hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/30 shrink-0"
+                        title="Delete status"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {/* Add status form */}
+                <div className="shrink-0 border-t border-[hsl(var(--border))] px-4 py-3">
+                  <form onSubmit={handleStatusMgrAdd} className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={newStatusColor}
+                      onChange={e => setNewStatusColor(e.target.value)}
+                      className="h-7 w-7 cursor-pointer rounded border-0 bg-transparent p-0 shrink-0"
+                      title="Pick color"
+                    />
+                    <input
+                      value={newStatusLabel}
+                      onChange={e => setNewStatusLabel(e.target.value)}
+                      placeholder="New status label…"
+                      className="flex-1 h-8 px-2 text-sm border border-[hsl(var(--border))] rounded-md bg-transparent outline-none focus:border-[var(--brand-primary)]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={statusMgrSaving || !newStatusLabel.trim()}
+                      className="flex items-center gap-1.5 rounded-md px-3 h-8 text-sm font-medium bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)] disabled:opacity-50 transition-colors shrink-0"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
             {/* ── Fixed Header ── */}
             <div className="shrink-0 border-b border-[hsl(var(--border))] px-4 py-3 flex flex-col gap-2">
               {/* Breadcrumb + action buttons */}
@@ -639,13 +767,22 @@ export function TaskDrawer({
                     </button>
                   </PopoverTrigger>
                   <PopoverContent align="start" className="w-44 p-1">
-                    {statuses.map(s => (
+                    {localStatuses.map(s => (
                       <button key={s.key} onClick={() => handleStatusChange(s.key)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] transition-colors">
                         <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                         {s.label}
-                        {status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[#0066CC]" />}
+                        {status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[var(--brand-primary)]" />}
                       </button>
                     ))}
+                    {isAdmin && (
+                      <>
+                        <div className="border-t my-1" />
+                        <button onClick={() => setStatusMgrOpen(true)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--brand-primary)] hover:bg-[hsl(var(--muted))] transition-colors">
+                          <CircleDot className="h-3.5 w-3.5" />
+                          Manage statuses
+                        </button>
+                      </>
+                    )}
                   </PopoverContent>
                 </Popover>
               </div>
@@ -676,7 +813,7 @@ export function TaskDrawer({
                     {isAdmin && (
                       <Popover open={addAssigneeOpen} onOpenChange={v => { setAddAssigneeOpen(v); if (!v) { setMemberSearch(''); setNewPermission('view'); } }}>
                         <PopoverTrigger asChild>
-                          <button className="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[#0066CC] hover:text-[#0066CC] transition-colors">
+                          <button className="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors">
                             <Plus className="h-3 w-3" />
                           </button>
                         </PopoverTrigger>
@@ -686,7 +823,7 @@ export function TaskDrawer({
                             placeholder="Search members…"
                             value={memberSearch}
                             onChange={e => setMemberSearch(e.target.value)}
-                            className="w-full h-8 px-2 text-sm border border-[hsl(var(--border))] rounded-md bg-transparent outline-none focus:border-[#0066CC]"
+                            className="w-full h-8 px-2 text-sm border border-[hsl(var(--border))] rounded-md bg-transparent outline-none focus:border-[var(--brand-primary)]"
                             autoFocus
                           />
                           <Select value={newPermission} onValueChange={setNewPermission}>
@@ -752,7 +889,7 @@ export function TaskDrawer({
                           <button key={key} onClick={() => handlePriorityChange(key)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] transition-colors">
                             <PIco className="h-3.5 w-3.5" style={{ color: meta.color }} />
                             {meta.label}
-                            {priority === key && <Check className="ml-auto h-3 w-3 text-[#0066CC]" />}
+                            {priority === key && <Check className="ml-auto h-3 w-3 text-[var(--brand-primary)]" />}
                           </button>
                         );
                       })}
@@ -806,7 +943,7 @@ export function TaskDrawer({
               <div className="px-4 py-3 border-b border-[hsl(var(--border))]">
                 <button
                   onClick={() => setSubtasksOpen(p => !p)}
-                  className="flex items-center gap-2 w-full text-sm font-semibold text-[hsl(var(--foreground))] mb-2 hover:text-[#0066CC] transition-colors"
+                  className="flex items-center gap-2 w-full text-sm font-semibold text-[hsl(var(--foreground))] mb-2 hover:text-[var(--brand-primary)] transition-colors"
                 >
                   <ChevronDown className={`h-4 w-4 transition-transform duration-150 ${subtasksOpen ? '' : '-rotate-90'}`} />
                   Subtasks
@@ -854,9 +991,9 @@ export function TaskDrawer({
                           }}
                           placeholder="Subtask name…"
                           autoFocus
-                          className="flex-1 text-sm bg-transparent outline-none border-b border-[hsl(var(--border))] focus:border-[#0066CC] py-1 transition-colors"
+                          className="flex-1 text-sm bg-transparent outline-none border-b border-[hsl(var(--border))] focus:border-[var(--brand-primary)] py-1 transition-colors"
                         />
-                        <button onClick={handleAddSubtask} className="text-[#0066CC] hover:text-[#0052A3] transition-colors">
+                        <button onClick={handleAddSubtask} className="text-[var(--brand-primary)] hover:text-[var(--brand-primary-hover)] transition-colors">
                           <Check className="h-3.5 w-3.5" />
                         </button>
                         <button onClick={() => { setAddingSubtask(false); setNewSubtaskText(''); }} className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors">
@@ -866,7 +1003,7 @@ export function TaskDrawer({
                     ) : (
                       <button
                         onClick={() => setAddingSubtask(true)}
-                        className="flex items-center gap-2 px-1 py-1 text-sm text-[hsl(var(--muted-foreground))] hover:text-[#0066CC] transition-colors"
+                        className="flex items-center gap-2 px-1 py-1 text-sm text-[hsl(var(--muted-foreground))] hover:text-[var(--brand-primary)] transition-colors"
                       >
                         <Plus className="h-3.5 w-3.5" />
                         Add subtask
@@ -891,7 +1028,7 @@ export function TaskDrawer({
                     className={[
                       'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
                       activeTab === tab.key
-                        ? 'border-[#0066CC] text-[#0066CC]'
+                        ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
                         : 'border-transparent text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]',
                     ].join(' ')}
                   >
@@ -925,7 +1062,7 @@ export function TaskDrawer({
                             <span className="text-xs text-[hsl(var(--muted-foreground))]">
                               {new Date(c.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            {!isDeleted && c.type === 'voice' && <span className="text-[10px] bg-[#0066CC]/10 text-[#0066CC] rounded-full px-1.5 py-0.5">Voice</span>}
+                            {!isDeleted && c.type === 'voice' && <span className="text-[10px] bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] rounded-full px-1.5 py-0.5">Voice</span>}
                             {!isDeleted && canDeleteComment && (
                               <div className="ml-auto">
                                 <Popover open={openMenuId === c.id} onOpenChange={v => setOpenMenuId(v ? c.id : null)}>
@@ -1030,7 +1167,7 @@ export function TaskDrawer({
                       onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend(e); }}
                       placeholder="Add a comment…"
                       rows={2}
-                      className="w-full bg-transparent text-sm leading-relaxed outline-none border border-[hsl(var(--border))] rounded-md p-2 focus:border-[#0066CC] transition-colors resize-none placeholder:text-[hsl(var(--muted-foreground))]"
+                      className="w-full bg-transparent text-sm leading-relaxed outline-none border border-[hsl(var(--border))] rounded-md p-2 focus:border-[var(--brand-primary)] transition-colors resize-none placeholder:text-[hsl(var(--muted-foreground))]"
                     />
                   )}
                   <div className="flex items-center gap-1">
@@ -1051,7 +1188,7 @@ export function TaskDrawer({
                     <button
                       type="submit"
                       disabled={(!commentText.trim() && !voiceBlob && !attachedFile) || sendingComment || recording}
-                      className="ml-auto flex h-7 w-7 items-center justify-center rounded-full bg-[#0066CC] text-white hover:bg-[#0052A3] transition-colors disabled:opacity-40"
+                      className="ml-auto flex h-7 w-7 items-center justify-center rounded-full bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-40"
                       title="Send"
                     >
                       {sendingComment ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowUp className="h-3.5 w-3.5" />}

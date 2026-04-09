@@ -152,6 +152,8 @@ db.exec(`
 const userCols = db.pragma('table_info(users)').map(c => c.name);
 if (!userCols.includes('full_name')) db.exec('ALTER TABLE users ADD COLUMN full_name TEXT');
 if (!userCols.includes('avatar_color')) db.exec('ALTER TABLE users ADD COLUMN avatar_color TEXT');
+if (!userCols.includes('brand_color')) db.exec("ALTER TABLE users ADD COLUMN brand_color TEXT DEFAULT '#2EC4B6'");
+if (!userCols.includes('theme_mode')) db.exec("ALTER TABLE users ADD COLUMN theme_mode TEXT DEFAULT 'system'"  );
 
 const notifCols = db.pragma('table_info(notifications)').map(c => c.name);
 if (!notifCols.includes('title')) db.exec('ALTER TABLE notifications ADD COLUMN title TEXT');

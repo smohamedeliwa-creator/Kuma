@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronDown, ChevronRight, Plus, ArrowLeft, Trash2, Pencil,
   Send, Calendar, User, MessageSquare, Loader2, Mail, Copy, Check,
-  UserPlus, X, SlidersHorizontal, Mic, Paperclip, Play, Pause,
+  UserPlus, X, Mic, Paperclip, Play, Pause,
   Download, FileText, Image as ImageIcon, Music2, Video, StopCircle, MoreHorizontal, Share2,
-  CircleDot, Columns3, ListPlus, AlertCircle, ArrowUp, Minus, ArrowDown,
+  ListPlus, AlertCircle, ArrowUp, Minus, ArrowDown,
   List, LayoutGrid, GanttChartSquare,
 } from 'lucide-react';
 import { KanbanBoard } from '@/components/KanbanBoard';
@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -36,7 +35,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import {
-  ColumnTypeIcon, ColumnCellValue, ColumnField, AddColumnButton, ColumnSettingsDialog,
+  ColumnTypeIcon, ColumnCellValue, ColumnField, AddColumnButton, COLUMN_TYPES,
 } from '@/components/CustomColumns';
 import { ShareDialog } from '@/components/ShareDialog';
 import { TaskDrawer } from '@/components/TaskDrawer';
@@ -125,7 +124,7 @@ function AudioPlayer({ src, duration }) {
       <button
         type="button"
         onClick={toggle}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0066CC] text-white hover:bg-[#0055aa] transition-colors"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--brand-primary)] text-white hover:bg-[#0055aa] transition-colors"
         aria-label={playing ? 'Pause' : 'Play'}
       >
         {playing
@@ -139,7 +138,7 @@ function AudioPlayer({ src, duration }) {
             className="flex-1 max-w-[4px] rounded-full transition-colors duration-100"
             style={{
               height: `${h * 100}%`,
-              backgroundColor: i / BAR_COUNT <= progress ? '#0066CC' : 'hsl(var(--muted-foreground))',
+              backgroundColor: i / BAR_COUNT <= progress ? 'var(--brand-primary)' : 'hsl(var(--muted-foreground))',
               opacity: i / BAR_COUNT <= progress ? 1 : 0.35,
             }}
           />
@@ -536,7 +535,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
                             <button key={s.key} onClick={() => handleStatusChange(s.key)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] transition-colors">
                               <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                               {s.label}
-                              {status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[#0066CC]" />}
+                              {status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[var(--brand-primary)]" />}
                             </button>
                           ))}
                         </PopoverContent>
@@ -567,7 +566,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
               <div className="flex flex-1 overflow-hidden flex-col lg:flex-row">
 
                 {/* Properties panel — right on desktop, top-collapsible on mobile */}
-                <div className={`lg:order-2 lg:w-[260px] lg:border-l border-[hsl(var(--border))] overflow-y-auto shrink-0 ${propertiesOpen ? 'block border-b' : 'hidden'} lg:block lg:border-b-0`}>
+                <div className={`lg:order-2 lg:w-[260px] overflow-y-auto shrink-0 ${propertiesOpen ? 'block border-b border-[hsl(var(--border))]' : 'hidden'} lg:block lg:border-b-0 ${propertiesOpen ? 'lg:border-l lg:border-[hsl(var(--border))]' : 'lg:border-l-0'}`}>
                   <div className="p-3 space-y-0.5">
 
                     <PropRow icon={User} label={columns.find(c => c.column_key === 'assignees')?.label || 'Assignees'}>
@@ -582,7 +581,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
                         {isAdmin && (
                           <Popover open={addAssigneeOpen} onOpenChange={v => { setAddAssigneeOpen(v); if (!v) { setMemberSearch(''); setNewPermission('view'); } }}>
                             <PopoverTrigger asChild>
-                              <button className="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[#0066CC] hover:text-[#0066CC] transition-colors">
+                              <button className="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors">
                                 <Plus className="h-3 w-3" />
                               </button>
                             </PopoverTrigger>
@@ -601,7 +600,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
                                   <button key={m.id} disabled={assigneeBusy} onClick={() => handleAddAssignee(m.id)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] disabled:opacity-50">
                                     <User className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
                                     <span className="flex-1 truncate text-left">{m.username}</span>
-                                    {m.role === 'admin' && <span className="text-[10px] text-[#0066CC]">admin</span>}
+                                    {m.role === 'admin' && <span className="text-[10px] text-[var(--brand-primary)]">admin</span>}
                                   </button>
                                 ))}
                                 {projectMembers.filter(m => !task?.assignments?.some(a => a.id === m.id)).length === 0 && <p className="py-2 text-center text-xs text-[hsl(var(--muted-foreground))]">All members assigned</p>}
@@ -638,7 +637,7 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
                               <button key={opt.value} onClick={() => handlePriorityChange(opt.value)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[hsl(var(--muted))] transition-colors">
                                 <PIco className="h-3.5 w-3.5" style={{ color: PMeta.color }} />
                                 <span>{opt.label}</span>
-                                {priority === opt.value && <Check className="ml-auto h-3.5 w-3.5 text-[#0066CC]" />}
+                                {priority === opt.value && <Check className="ml-auto h-3.5 w-3.5 text-[var(--brand-primary)]" />}
                               </button>
                             );
                           })}
@@ -708,11 +707,11 @@ function TaskSheet({ taskId, projectId, open, onOpenChange, isAdmin, onUpdated, 
                         return (
                           <div key={c.id} className="group relative rounded-lg bg-[hsl(var(--muted))] p-3">
                             <div className="flex items-center gap-2 mb-1.5">
-                              <span className="text-xs font-semibold text-[#0066CC]">{c.username}</span>
+                              <span className="text-xs font-semibold text-[var(--brand-primary)]">{c.username}</span>
                               <span className="text-xs text-[hsl(var(--muted-foreground))]">
                                 {new Date(c.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                               </span>
-                              {!isDeleted && c.type === 'voice' && <span className="text-[10px] bg-[#0066CC]/10 text-[#0066CC] rounded-full px-1.5 py-0.5 font-medium">Voice</span>}
+                              {!isDeleted && c.type === 'voice' && <span className="text-[10px] bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] rounded-full px-1.5 py-0.5 font-medium">Voice</span>}
                               {!isDeleted && canDeleteComment && (
                                 <div className="ml-auto">
                                   <Popover open={openMenuId === c.id} onOpenChange={(v) => setOpenMenuId(v ? c.id : null)}>
@@ -896,20 +895,30 @@ function TaskRow({ task, columns, statuses = [], listColumns = [], colValues = {
     }, 300);
   }
 
+  // Parse assignee_names "a, b, c" → show first + "+N more"
+  const assigneeList = task.assignee_names ? task.assignee_names.split(', ').filter(Boolean) : [];
+  const assigneeVisible = assigneeList[0] || null;
+  const assigneeOverflow = assigneeList.length > 1 ? assigneeList.length - 1 : 0;
+
+  const TD_STYLE = { height: '48px', maxHeight: '48px', overflow: 'hidden', whiteSpace: 'nowrap', verticalAlign: 'middle' };
+
   const cells = {
     name: (
-      <td className="py-2.5 pl-4 pr-3 text-sm font-medium cursor-pointer hover:text-[#0066CC] transition-colors" onClick={onClick}>
-        {task.name}
+      <td style={TD_STYLE} className="pl-4 pr-3 cursor-pointer hover:text-[var(--brand-primary)] transition-colors" onClick={onClick}>
+        <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px', fontWeight: 600, fontSize: 14 }}>
+          {task.name}
+        </span>
       </td>
     ),
     due_date: (
       <td
-        className={`px-3 py-2.5 text-sm transition-colors ${flashField === 'due_date' ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
+        style={TD_STYLE}
+        className={`px-3 text-sm transition-colors ${flashField === 'due_date' ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
         onClick={e => e.stopPropagation()}
       >
         <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
           <PopoverTrigger asChild>
-            <button className="group flex items-center gap-1 w-full rounded px-1 py-0.5 hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] cursor-pointer transition-colors text-left">
+            <button className="group flex items-center gap-1 w-full rounded px-1 py-0.5 hover:bg-[var(--surface-hover)] dark:hover:bg-[var(--surface-hover)] cursor-pointer transition-colors text-left">
               <Calendar className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
               <span className={task.due_date
                 ? dueDateStatus === 'overdue' ? 'text-red-500' : 'text-[hsl(var(--muted-foreground))]'
@@ -926,7 +935,7 @@ function TaskRow({ task, columns, statuses = [], listColumns = [], colValues = {
               type="date"
               value={localDueDate}
               onChange={e => setLocalDueDate(e.target.value)}
-              className="w-full rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#0066CC]/30"
+              className="w-full rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/30"
             />
             <div className="flex items-center justify-between gap-2">
               {localDueDate && (
@@ -940,12 +949,13 @@ function TaskRow({ task, columns, statuses = [], listColumns = [], colValues = {
     ),
     status: (
       <td
-        className={`px-3 py-2.5 transition-colors ${flashField === 'status' ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
+        style={TD_STYLE}
+        className={`px-3 transition-colors ${flashField === 'status' ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
         onClick={e => e.stopPropagation()}
       >
         <Popover open={statusOpen} onOpenChange={setStatusOpen}>
           <PopoverTrigger asChild>
-            <button className="group flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] cursor-pointer transition-colors">
+            <button className="group flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-[var(--surface-hover)] dark:hover:bg-[var(--surface-hover)] cursor-pointer transition-colors">
               <StatusBadge statusKey={task.status} statuses={statuses} />
               <Pencil className="h-3 w-3 text-[hsl(var(--muted-foreground))] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
             </button>
@@ -959,7 +969,7 @@ function TaskRow({ task, columns, statuses = [], listColumns = [], colValues = {
               >
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
                 {s.label}
-                {task.status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[#0066CC]" />}
+                {task.status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[var(--brand-primary)]" />}
               </button>
             ))}
           </PopoverContent>
@@ -968,13 +978,26 @@ function TaskRow({ task, columns, statuses = [], listColumns = [], colValues = {
     ),
     assignees: (
       <td
-        className="group px-3 py-2.5 pr-4 text-sm text-[hsl(var(--muted-foreground))] cursor-pointer hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] transition-colors"
+        style={TD_STYLE}
+        className="group px-3 pr-4 text-sm text-[hsl(var(--muted-foreground))] cursor-pointer hover:bg-[var(--surface-hover)] dark:hover:bg-[var(--surface-hover)] transition-colors"
         onClick={onClick}
-        title="Click to open task and manage assignees"
+        title={task.assignee_names || undefined}
       >
-        <span className="flex items-center gap-1">
-          {task.assignee_names || '—'}
-          <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+        <span className="flex items-center gap-1 overflow-hidden flex-nowrap">
+          {assigneeVisible ? (
+            <>
+              <span className="truncate max-w-[80px]">{assigneeVisible}</span>
+              {assigneeOverflow > 0 && (
+                <span
+                  className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap flex-shrink-0 bg-[var(--surface-secondary)] text-[var(--text-muted)]"
+                  title={assigneeList.slice(1).join(', ')}
+                >
+                  +{assigneeOverflow}
+                </span>
+              )}
+            </>
+          ) : '—'}
+          <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-auto" />
         </span>
       </td>
     ),
@@ -982,6 +1005,7 @@ function TaskRow({ task, columns, statuses = [], listColumns = [], colValues = {
 
   return (
     <tr
+      style={{ height: '48px', maxHeight: '48px' }}
       className={[
         'transition-colors',
         dueDateStatus === 'overdue' ? 'border-l-2 border-l-red-500' : '',
@@ -996,12 +1020,13 @@ function TaskRow({ task, columns, statuses = [], listColumns = [], colValues = {
         return (
           <td
             key={col.id}
-            className={`px-3 py-2.5 text-sm transition-colors ${isFlash ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
+            style={TD_STYLE}
+            className={`px-3 text-sm transition-colors ${isFlash ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
             onClick={e => e.stopPropagation()}
           >
             <Popover open={colOpen[col.id] || false} onOpenChange={v => setColOpen(prev => ({ ...prev, [col.id]: v }))}>
               <PopoverTrigger asChild>
-                <button className="group flex items-center gap-1 w-full text-left rounded px-1 py-0.5 hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] cursor-pointer transition-colors">
+                <button className="group flex items-center gap-1 w-full text-left rounded px-1 py-0.5 hover:bg-[var(--surface-hover)] dark:hover:bg-[var(--surface-hover)] cursor-pointer transition-colors">
                   <span className="flex-1 min-w-0 truncate">
                     <ColumnCellValue column={col} value={colValues[col.id] ?? null} />
                   </span>
@@ -1064,7 +1089,7 @@ function QuickActionsMenu({ task, statuses, isAdmin, onClose, onStatusChange, on
             >
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
               {s.label}
-              {task.status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[#0066CC]" />}
+              {task.status === s.key && <Check className="ml-auto h-3.5 w-3.5 text-[var(--brand-primary)]" />}
             </button>
           ))}
         </div>
@@ -1183,7 +1208,7 @@ function TaskCard({ task, statuses, listColumns, colValues, isAdmin, onOpen, onD
       >
         {/* Top: name + status */}
         <div className="flex items-start justify-between gap-2">
-          <p className="flex-1 text-[15px] font-semibold leading-snug text-[#111111] dark:text-[#F5F5F5]">{task.name}</p>
+          <p className="flex-1 text-[15px] font-semibold leading-snug text-[var(--text-primary)] dark:text-[var(--text-primary)]">{task.name}</p>
           <StatusBadge statusKey={task.status} statuses={statuses} />
         </div>
 
@@ -1259,6 +1284,657 @@ function TaskCard({ task, statuses, listColumns, colValues, isAdmin, onOpen, onD
   );
 }
 
+// ─── Column Header Menu ───────────────────────────────────────────────────────
+
+function ColumnHeaderMenu({ col, isAdmin, projectId, onUpdated, onDeleted, onDuplicated, isDefaultCol = false, allColumns, onColumnsUpdated }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [nameVal, setNameVal] = useState(col.label || col.name || '');
+  const [selectedType, setSelectedType] = useState(col.type || 'text');
+  const [typeConfirm, setTypeConfirm] = useState(false);
+  const [pendingType, setPendingType] = useState(null);
+
+  // Reset on open
+  useEffect(() => {
+    if (open) {
+      setNameVal(col.label || col.name || '');
+      setSelectedType(col.type || 'text');
+    }
+  }, [open, col]);
+
+  async function handleNameSave() {
+    const trimmed = nameVal.trim();
+    if (!trimmed) return;
+    if (isDefaultCol) {
+      // Update project-level column label
+      const updated = allColumns.map(c => c.column_key === col.column_key ? { ...c, label: trimmed } : c);
+      try {
+        const res = await api.put(`/api/projects/${projectId}/columns`, { columns: updated });
+        onColumnsUpdated?.(res.data);
+        setOpen(false);
+        toast({ title: 'Column renamed', variant: 'success' });
+      } catch {
+        toast({ title: 'Failed to rename column', variant: 'destructive' });
+      }
+    } else {
+      try {
+        const res = await api.put(`/api/columns/${col.id}`, { name: trimmed });
+        onUpdated?.(res.data);
+        setOpen(false);
+        toast({ title: 'Column renamed', variant: 'success' });
+      } catch {
+        toast({ title: 'Failed to rename column', variant: 'destructive' });
+      }
+    }
+  }
+
+  async function confirmTypeChange() {
+    if (!pendingType) return;
+    try {
+      const res = await api.put(`/api/columns/${col.id}`, { type: pendingType });
+      onUpdated?.(res.data);
+      setSelectedType(pendingType);
+      setTypeConfirm(false);
+      setPendingType(null);
+      setOpen(false);
+      toast({ title: 'Column type updated', variant: 'success' });
+    } catch {
+      toast({ title: 'Failed to update type', variant: 'destructive' });
+    }
+  }
+
+  async function handleDuplicate() {
+    try {
+      const res = await api.post(`/api/task-lists/${col.list_id}/columns`, {
+        name: (col.name || col.label) + ' (copy)',
+        type: col.type || 'text',
+        config: col.config || {},
+      });
+      onDuplicated?.(res.data);
+      setOpen(false);
+      toast({ title: 'Column duplicated', variant: 'success' });
+    } catch {
+      toast({ title: 'Failed to duplicate column', variant: 'destructive' });
+    }
+  }
+
+  async function handleDelete() {
+    try {
+      await api.delete(`/api/columns/${col.id}`);
+      onDeleted?.(col.id);
+      setOpen(false);
+      toast({ title: 'Column deleted', variant: 'success' });
+    } catch {
+      toast({ title: 'Failed to delete column', variant: 'destructive' });
+    }
+  }
+
+  return (
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            className={`text-left hover:text-[var(--brand-primary)] transition-colors ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}
+            onClick={e => { if (!isAdmin) { e.preventDefault(); e.stopPropagation(); } }}
+          >
+            {col.label || col.name}
+          </button>
+        </PopoverTrigger>
+        {isAdmin && (
+          <PopoverContent align="start" style={{ width: 220, padding: 12 }} className="space-y-3">
+            {/* Name input */}
+            <input
+              value={nameVal}
+              onChange={e => setNameVal(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleNameSave(); } }}
+              className="w-full h-8 px-2 text-sm border border-[hsl(var(--border))] rounded-md bg-transparent outline-none focus:border-[var(--brand-primary)] mb-3"
+              autoFocus
+              placeholder="Column name"
+            />
+            {/* Type selector — only for custom columns */}
+            {!isDefaultCol && (
+              <div>
+                <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }} className="text-[hsl(var(--muted-foreground))] mb-1.5">Column Type</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 6 }}>
+                  {COLUMN_TYPES.map(({ type, label, Icon }) => {
+                    const isSelected = selectedType === type;
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          if (type !== selectedType) {
+                            setPendingType(type);
+                            setTypeConfirm(true);
+                          }
+                        }}
+                        className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs border-[1.5px] transition-colors ${
+                          isSelected
+                            ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-light,hsl(var(--muted)))] text-[var(--brand-primary)]'
+                            : 'border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--foreground))/30]'
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {/* Bottom actions */}
+            <div className="flex justify-between pt-1 border-t border-[hsl(var(--border))]">
+              {!isDefaultCol ? (
+                <button
+                  onClick={handleDuplicate}
+                  className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors px-1 py-1 rounded hover:bg-[hsl(var(--muted))]"
+                >
+                  <Copy className="h-3 w-3" />
+                  Duplicate
+                </button>
+              ) : <span />}
+              {!isDefaultCol && (
+                <button
+                  onClick={handleDelete}
+                  className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors px-1 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950/20"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Delete
+                </button>
+              )}
+            </div>
+          </PopoverContent>
+        )}
+      </Popover>
+
+      {/* Type change confirmation */}
+      <AlertDialog open={typeConfirm} onOpenChange={v => { setTypeConfirm(v); if (!v) setPendingType(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change column type?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Changing the type may affect existing values in this column. This action cannot be undone. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmTypeChange}>Continue</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+// ─── Rich Task Create Modal ────────────────────────────────────────────────────
+
+const PRIORITY_CREATE_OPTIONS = [
+  { value: 'urgent', label: 'Urgent', color: '#EF4444' },
+  { value: 'high',   label: 'High',   color: '#F97316' },
+  { value: 'normal', label: 'Normal', color: '#3B82F6' },
+  { value: 'low',    label: 'Low',    color: '#94A3B8' },
+];
+
+const EXTRA_PROP_DESCS = {
+  text: 'Plain text note',
+  number: 'Numeric value',
+  select: 'Single choice',
+  multi_select: 'Multiple choices',
+  date: 'Date or deadline',
+  person: 'Free text person tag',
+  file: 'File attachment',
+  url: 'Web link',
+  checkbox: 'Checklist items',
+  status: 'Custom status badge',
+};
+
+function ExtraPropInput({ type, value, onChange, colConfig, newOptions, onNewOptionsChange, statuses }) {
+  const [optionInput, setOptionInput] = useState('');
+
+  function addNewOption(label) {
+    const l = label.trim();
+    if (!l || newOptions.some(o => o.label === l)) return;
+    const colors = ['#6C47FF', '#059669', '#D97706', '#DC2626', '#0891B2', '#EC4899'];
+    const color = colors[newOptions.length % colors.length];
+    onNewOptionsChange([...newOptions, { label: l, color }]);
+    setOptionInput('');
+  }
+
+  if (type === 'select') {
+    const opts = colConfig?.options?.length > 0 ? colConfig.options : newOptions;
+    const selected = value;
+    return (
+      <div className="space-y-1.5">
+        {opts.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {opts.map(opt => (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => onChange(selected === opt.label ? null : opt.label)}
+                className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: selected === opt.label ? opt.color : opt.color + '33',
+                  color: selected === opt.label ? getContrastColor(opt.color) : opt.color,
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {!colConfig?.options?.length && (
+          <input
+            value={optionInput}
+            onChange={e => setOptionInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addNewOption(optionInput); } }}
+            onBlur={() => { if (optionInput.trim()) addNewOption(optionInput); }}
+            placeholder="+ Create option, press Enter…"
+            className="w-full h-8 text-xs rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/30 text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]"
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (type === 'multi_select') {
+    const opts = colConfig?.options?.length > 0 ? colConfig.options : newOptions;
+    const selected = Array.isArray(value) ? value : [];
+    const allOpts = opts;
+    return (
+      <div className="space-y-1.5">
+        {allOpts.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {allOpts.map(opt => {
+              const isSel = selected.includes(opt.label);
+              return (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => {
+                    const next = isSel ? selected.filter(v => v !== opt.label) : [...selected, opt.label];
+                    onChange(next.length > 0 ? next : null);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-all"
+                  style={{
+                    backgroundColor: isSel ? opt.color : opt.color + '33',
+                    color: isSel ? getContrastColor(opt.color) : opt.color,
+                  }}
+                >
+                  {opt.label}
+                  {isSel && <X className="h-2.5 w-2.5" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {!colConfig?.options?.length && (
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {newOptions.map(opt => {
+              const isSel = selected.includes(opt.label);
+              return (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => {
+                    const next = isSel ? selected.filter(v => v !== opt.label) : [...selected, opt.label];
+                    onChange(next.length > 0 ? next : null);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-all"
+                  style={{
+                    backgroundColor: isSel ? opt.color : opt.color + '33',
+                    color: isSel ? getContrastColor(opt.color) : opt.color,
+                  }}
+                >
+                  {opt.label}
+                  {isSel && <X className="h-2.5 w-2.5" />}
+                </button>
+              );
+            })}
+            <input
+              value={optionInput}
+              onChange={e => setOptionInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addNewOption(optionInput); } }}
+              onBlur={() => { if (optionInput.trim()) addNewOption(optionInput); }}
+              placeholder="+ Add tag…"
+              style={{ width: 110 }}
+              className="h-7 text-xs rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/30 text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]"
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (type === 'status') {
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {statuses.map(s => {
+          const isSel = value === s.key;
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => onChange(isSel ? null : s.key)}
+              className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium transition-all"
+              style={{
+                backgroundColor: isSel ? s.color : s.color + '33',
+                color: isSel ? getContrastColor(s.color) : s.color,
+              }}
+            >
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // All other types: delegate to ColumnField
+  return (
+    <ColumnField
+      column={{ type, name: '', config: colConfig || {} }}
+      value={value}
+      onChange={onChange}
+      canEdit
+    />
+  );
+}
+
+function ExtraPropRow({ prop, statuses, onValueChange, onOptionsChange, onRemove }) {
+  const typeDef = COLUMN_TYPES.find(t => t.type === prop.type);
+  const Icon = typeDef?.Icon;
+  return (
+    <div className="group/eprow flex items-start gap-3 py-[10px] border-b border-[hsl(var(--border))]">
+      <div style={{ width: 120, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, paddingTop: 6 }}>
+        {Icon && <Icon style={{ width: 14, height: 14, color: 'hsl(var(--muted-foreground))', flexShrink: 0 }} />}
+        <span style={{ fontSize: 12, fontWeight: 500, color: 'hsl(var(--muted-foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {prop.colName}
+        </span>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <ExtraPropInput
+          type={prop.type}
+          value={prop.value}
+          onChange={onValueChange}
+          colConfig={prop.colConfig}
+          newOptions={prop.newOptions}
+          onNewOptionsChange={onOptionsChange}
+          statuses={statuses}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="opacity-0 group-hover/eprow:opacity-100 transition-opacity shrink-0 text-[hsl(var(--muted-foreground))] hover:text-red-600"
+        style={{ marginTop: 6 }}
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+function RichTaskCreateModal({ open, onOpenChange, list, statuses, listColumns, projectMembers, onCreated }) {
+  const { toast } = useToast();
+  const [newTaskData, setNewTaskData] = useState({ name: '', due_date: '', status: '', priority: 'normal' });
+  const [extraProps, setExtraProps] = useState([]);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setNewTaskData({ name: '', due_date: '', status: statuses[0]?.key || 'todo', priority: 'normal' });
+      setExtraProps([]);
+      setCreateError('');
+      setPickerOpen(false);
+      setPickerSearch('');
+    }
+  }, [open, statuses]);
+
+  function addExtraProp(type) {
+    const typeDef = COLUMN_TYPES.find(t => t.type === type);
+    const existingCol = listColumns.find(c => c.type === type);
+    setExtraProps(prev => [...prev, {
+      uid: `${type}-${Date.now()}`,
+      type,
+      colId: existingCol?.id ?? null,
+      colName: existingCol?.name ?? typeDef?.label ?? type,
+      colConfig: existingCol?.config ?? {},
+      value: null,
+      newOptions: [],
+    }]);
+    setPickerOpen(false);
+    setPickerSearch('');
+  }
+
+  function updateExtraPropValue(uid, value) {
+    setExtraProps(prev => prev.map(p => p.uid === uid ? { ...p, value } : p));
+  }
+
+  function updateExtraPropOptions(uid, newOptions) {
+    setExtraProps(prev => prev.map(p => p.uid === uid ? { ...p, newOptions } : p));
+  }
+
+  function removeExtraProp(uid) {
+    setExtraProps(prev => prev.filter(p => p.uid !== uid));
+  }
+
+  async function handleSubmit(e) {
+    e?.preventDefault();
+    if (!newTaskData.name.trim()) { setCreateError('Task name is required.'); return; }
+    setCreateError('');
+    setCreating(true);
+    try {
+      const res = await api.post(`/api/task-lists/${list.id}/tasks`, {
+        name: newTaskData.name.trim(),
+        due_date: newTaskData.due_date || null,
+        status: newTaskData.status || statuses[0]?.key || 'todo',
+        assignees: [],
+        priority: newTaskData.priority,
+      });
+      const taskId = res.data.id;
+      let colValsForTask = {};
+      const newColumns = [];
+
+      if (extraProps.length > 0) {
+        const vals = [];
+        for (const prop of extraProps) {
+          if (prop.value === null || prop.value === undefined) continue;
+          let colId = prop.colId;
+          if (!colId) {
+            const cfg = {};
+            if ((prop.type === 'select' || prop.type === 'multi_select') && prop.newOptions.length > 0) {
+              cfg.options = prop.newOptions;
+            }
+            const colRes = await api.post(`/api/task-lists/${list.id}/columns`, {
+              name: prop.colName,
+              type: prop.type,
+              config: cfg,
+            });
+            colId = colRes.data.id;
+            newColumns.push(colRes.data);
+          }
+          const serialized = Array.isArray(prop.value) || (typeof prop.value === 'object' && prop.value !== null)
+            ? JSON.stringify(prop.value)
+            : String(prop.value);
+          vals.push({ column_id: colId, value: serialized });
+        }
+        if (vals.length > 0) {
+          try {
+            const cvRes = await api.put(`/api/tasks/${taskId}/column-values`, { values: vals });
+            for (const v of cvRes.data) colValsForTask[v.column_id] = v.value;
+          } catch { /* non-fatal */ }
+        }
+      }
+
+      onCreated(res.data, colValsForTask, newColumns);
+      onOpenChange(false);
+      toast({ title: 'Task created', variant: 'success' });
+    } catch (err) {
+      setCreateError(err.response?.data?.error || 'Failed to create task');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  const filteredTypes = COLUMN_TYPES.filter(t =>
+    t.label.toLowerCase().includes(pickerSearch.toLowerCase()) ||
+    (EXTRA_PROP_DESCS[t.type] || '').toLowerCase().includes(pickerSearch.toLowerCase())
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent style={{ maxWidth: 540, maxHeight: '80vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b border-[hsl(var(--border))] shrink-0">
+          <DialogTitle className="text-base font-semibold">New Task — {list.name}</DialogTitle>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {/* Task name */}
+          <input
+            value={newTaskData.name}
+            onChange={e => setNewTaskData(p => ({ ...p, name: e.target.value }))}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit(); } }}
+            placeholder="What needs to be done?"
+            autoFocus
+            style={{ fontSize: 16, fontWeight: 600 }}
+            className="w-full bg-transparent border-b border-[hsl(var(--border))] pb-2 outline-none focus:border-[var(--brand-primary)] transition-colors placeholder:text-[hsl(var(--muted-foreground))] text-[hsl(var(--foreground))]"
+          />
+
+          {/* Due Date + Status */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Due Date</Label>
+              <Input type="date" value={newTaskData.due_date} onChange={e => setNewTaskData(p => ({ ...p, due_date: e.target.value }))} className="h-9" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Status</Label>
+              <Select value={newTaskData.status} onValueChange={v => setNewTaskData(p => ({ ...p, status: v }))}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {statuses.map(s => <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Priority */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Priority</Label>
+            <div className="flex gap-2 flex-wrap">
+              {PRIORITY_CREATE_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setNewTaskData(p => ({ ...p, priority: opt.value }))}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border-[1.5px] transition-colors"
+                  style={{
+                    borderColor: newTaskData.priority === opt.value ? opt.color : 'hsl(var(--border))',
+                    backgroundColor: newTaskData.priority === opt.value ? `${opt.color}18` : 'transparent',
+                    color: newTaskData.priority === opt.value ? opt.color : 'hsl(var(--muted-foreground))',
+                  }}
+                >
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Extra properties */}
+          <div className="border-t border-[hsl(var(--border))] pt-1">
+            {extraProps.map(prop => (
+              <ExtraPropRow
+                key={prop.uid}
+                prop={prop}
+                statuses={statuses}
+                onValueChange={val => updateExtraPropValue(prop.uid, val)}
+                onOptionsChange={opts => updateExtraPropOptions(prop.uid, opts)}
+                onRemove={() => removeExtraProp(prop.uid)}
+              />
+            ))}
+
+            {/* + Add property button */}
+            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 py-2 bg-transparent border-none cursor-pointer hover:opacity-75 transition-opacity"
+                  style={{ color: 'var(--brand-primary)', fontSize: 13, fontWeight: 500 }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add property
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="p-0" style={{ width: 220 }}>
+                {/* Search */}
+                <div className="border-b border-[hsl(var(--border))]">
+                  <input
+                    value={pickerSearch}
+                    onChange={e => setPickerSearch(e.target.value)}
+                    placeholder="Search properties..."
+                    autoFocus
+                    className="w-full h-8 px-3 bg-transparent outline-none text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]"
+                    style={{ fontSize: 13 }}
+                  />
+                </div>
+                {/* Type list */}
+                <div style={{ maxHeight: 280, overflowY: 'auto', padding: '4px 0' }}>
+                  <p className="px-3 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                    Column Types
+                  </p>
+                  {filteredTypes.map(({ type, label, Icon }) => {
+                    const alreadyInTable = listColumns.some(c => c.type === type);
+                    const alreadyAdded = extraProps.some(p => p.type === type);
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => addExtraProp(type)}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 hover:bg-[hsl(var(--muted))] transition-colors cursor-pointer bg-transparent border-none text-left"
+                        style={{ fontSize: 13, color: 'hsl(var(--foreground))' }}
+                      >
+                        <Icon className="h-3.5 w-3.5 text-[hsl(var(--muted-foreground))] shrink-0" />
+                        <span className="flex-1 min-w-0">
+                          <span className="block">{label}</span>
+                          <span className="block text-[11px] text-[hsl(var(--muted-foreground))]">{EXTRA_PROP_DESCS[type]}</span>
+                        </span>
+                        {(alreadyInTable || alreadyAdded) && (
+                          <span className="text-[10px] text-[hsl(var(--muted-foreground))] shrink-0 flex items-center gap-0.5">
+                            <Check className="h-3 w-3" />
+                            {alreadyAdded ? 'Added' : 'In table'}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                  {filteredTypes.length === 0 && (
+                    <p className="px-3 py-4 text-center text-[hsl(var(--muted-foreground))]" style={{ fontSize: 12 }}>No results</p>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {createError && <p className="text-sm text-red-600">{createError}</p>}
+        </div>
+
+        {/* Pinned footer */}
+        <div className="px-6 py-4 border-t border-[hsl(var(--border))] shrink-0 flex items-center justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={creating}>
+            {creating ? 'Creating…' : 'Create Task'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Task List Section ────────────────────────────────────────────────────────
 
 const DEFAULT_COLS = [
@@ -1268,7 +1944,7 @@ const DEFAULT_COLS = [
   { column_key: 'assignees', label: 'Assigned To', visible: 1 },
 ];
 
-function TaskListSection({ list: initialList, projectId, projectName = '', columns = DEFAULT_COLS, statuses = [], isAdmin, onDeleted, members = [] }) {
+function TaskListSection({ list: initialList, projectId, projectName = '', columns = DEFAULT_COLS, statuses = [], isAdmin, onDeleted, members = [], onColumnsUpdated, onStatusesUpdated }) {
   const { toast } = useToast();
   const [list, setList] = useState(initialList);
   const [tasks, setTasks] = useState([]);
@@ -1277,9 +1953,6 @@ function TaskListSection({ list: initialList, projectId, projectName = '', colum
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [newTask, setNewTask] = useState({ name: '', due_date: '', status: 'todo' });
-  const [createError, setCreateError] = useState('');
-  const [creating, setCreating] = useState(false);
 
   // Rename
   const [renaming, setRenaming] = useState(false);
@@ -1294,8 +1967,6 @@ function TaskListSection({ list: initialList, projectId, projectName = '', colum
   const [colValues, setColValues] = useState({}); // { [taskId]: { [colId]: value } }
   const [dragColId, setDragColId] = useState(null);
   const [dragOverColId, setDragOverColId] = useState(null);
-  const [settingsCol, setSettingsCol] = useState(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   async function handleRenameSubmit(e) {
     e.preventDefault();
@@ -1394,35 +2065,24 @@ function TaskListSection({ list: initialList, projectId, projectName = '', colum
     setDragOverColId(null);
   }
 
-  async function handleCreateTask(e) {
-    e.preventDefault();
-    setCreateError('');
-    setCreating(true);
-    try {
-      const res = await api.post(`/api/task-lists/${list.id}/tasks`, {
-        name: newTask.name,
-        due_date: newTask.due_date || null,
-        status: newTask.status,
-        assignees: [],
-      });
-      setTasks((prev) => [...prev, { ...res.data, assignee_names: null }]);
-      setNewTask({ name: '', due_date: '', status: 'todo' });
-      setCreateOpen(false);
-      toast({ title: 'Task created', variant: 'success' });
-    } catch (err) {
-      setCreateError(err.response?.data?.error || 'Failed to create task');
-    } finally {
-      setCreating(false);
+  function handleRichTaskCreated(task, colVals, newCols) {
+    setTasks(prev => [...prev, { ...task, assignee_names: null }]);
+    if (colVals && Object.keys(colVals).length > 0) {
+      setColValues(prev => ({ ...prev, [task.id]: colVals }));
+    }
+    if (newCols && newCols.length > 0) {
+      setListColumns(prev => [...prev, ...newCols]);
+      onColumnsUpdated?.([...listColumns, ...newCols]);
     }
   }
 
   return (
-    <div className="rounded-lg border bg-[hsl(var(--card))] shadow-sm overflow-hidden">
+    <div className="rounded-lg border bg-[hsl(var(--card))] overflow-hidden">
       {/* Header */}
       <div className="group flex items-center justify-between px-4 py-3 bg-[hsl(var(--card))]">
         <div className="flex items-center gap-2 min-w-0">
           <button
-            className="flex items-center gap-1.5 text-sm font-semibold hover:text-[#0066CC] transition-colors shrink-0"
+            className="flex items-center gap-1.5 text-sm font-semibold hover:text-[var(--brand-primary)] transition-colors shrink-0"
             onClick={() => setCollapsed((c) => !c)}
           >
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -1437,12 +2097,12 @@ function TaskListSection({ list: initialList, projectId, projectName = '', colum
                 onBlur={handleRenameSubmit}
                 onKeyDown={e => e.key === 'Escape' && setRenaming(false)}
                 disabled={renameSaving}
-                className="h-7 rounded border bg-[hsl(var(--background))] px-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-[#0066CC]/30 min-w-0 w-40"
+                className="h-7 rounded border bg-[hsl(var(--background))] px-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/30 min-w-0 w-40"
               />
             </form>
           ) : (
             <button
-              className="flex items-center gap-2 text-sm font-semibold hover:text-[#0066CC] transition-colors"
+              className="flex items-center gap-2 text-sm font-semibold hover:text-[var(--brand-primary)] transition-colors"
               onClick={() => setCollapsed((c) => !c)}
             >
               {list.name}
@@ -1499,7 +2159,7 @@ function TaskListSection({ list: initialList, projectId, projectName = '', colum
               {isAdmin && (
                 <button
                   onClick={() => setCreateOpen(true)}
-                  className="mt-3 flex items-center gap-1.5 mx-auto rounded-md px-3 py-1.5 text-sm text-[#0066CC] hover:bg-[hsl(var(--muted))] transition-colors"
+                  className="mt-3 flex items-center gap-1.5 mx-auto rounded-md px-3 py-1.5 text-sm text-[var(--brand-primary)] hover:bg-[hsl(var(--muted))] transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   Add Task
@@ -1526,22 +2186,31 @@ function TaskListSection({ list: initialList, projectId, projectName = '', colum
               </div>
 
               {/* ── Desktop table (hidden below md) ── */}
-              <div className="hidden md:block overflow-x-auto border-t">
+              <div className="hidden md:block overflow-x-auto border-t max-w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="border-b bg-[hsl(var(--muted))/50] text-xs uppercase text-[hsl(var(--muted-foreground))]">
+                    <tr style={{ height: '40px', maxHeight: '40px' }} className="border-b bg-[hsl(var(--muted))/50] text-xs uppercase text-[hsl(var(--muted-foreground))]">
                       {columns.filter(c => c.visible).map((c, i) => (
                         <th
                           key={c.column_key}
-                          className={`py-2 font-medium ${i === 0 ? 'pl-4 pr-3' : 'px-3'}`}
+                          style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle' }}
+                          className={`font-medium ${i === 0 ? 'pl-4 pr-3' : 'px-3'}`}
                         >
-                          {c.label}
+                          <ColumnHeaderMenu
+                            col={c}
+                            isAdmin={isAdmin}
+                            projectId={projectId}
+                            isDefaultCol
+                            allColumns={columns}
+                            onColumnsUpdated={onColumnsUpdated}
+                          />
                         </th>
                       ))}
                       {listColumns.map(col => (
                         <th
                           key={col.id}
-                          className={`px-3 py-2 font-medium cursor-grab select-none transition-colors ${dragOverColId === col.id ? 'bg-[hsl(var(--muted))]' : ''}`}
+                          style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle' }}
+                          className={`px-3 font-medium cursor-grab select-none transition-colors ${dragOverColId === col.id ? 'bg-[hsl(var(--muted))]' : ''}`}
                           draggable
                           onDragStart={() => setDragColId(col.id)}
                           onDragOver={e => { e.preventDefault(); setDragOverColId(col.id); }}
@@ -1549,18 +2218,27 @@ function TaskListSection({ list: initialList, projectId, projectName = '', colum
                           onDrop={() => handleColumnDrop(dragColId, col.id)}
                           onDragEnd={() => { setDragColId(null); setDragOverColId(null); }}
                         >
-                          <div className="flex items-center gap-1 group/col">
+                          <div className="flex items-center gap-1">
                             <ColumnTypeIcon type={col.type} />
-                            <span>{col.name}</span>
-                            {isAdmin && (
-                              <button
-                                onClick={e => { e.stopPropagation(); setSettingsCol(col); setSettingsOpen(true); }}
-                                className="opacity-0 group-hover/col:opacity-100 transition-opacity ml-0.5 rounded p-0.5 hover:bg-[hsl(var(--background))]"
-                                title="Column settings"
-                              >
-                                <SlidersHorizontal className="h-3 w-3" />
-                              </button>
-                            )}
+                            <ColumnHeaderMenu
+                              col={{ ...col, list_id: list.id }}
+                              isAdmin={isAdmin}
+                              projectId={projectId}
+                              isDefaultCol={false}
+                              onUpdated={updated => setListColumns(prev => prev.map(c => c.id === updated.id ? updated : c))}
+                              onDeleted={colId => {
+                                setListColumns(prev => prev.filter(c => c.id !== colId));
+                                setColValues(prev => {
+                                  const next = { ...prev };
+                                  for (const tid of Object.keys(next)) {
+                                    const { [colId]: _, ...rest } = next[tid];
+                                    next[tid] = rest;
+                                  }
+                                  return next;
+                                });
+                              }}
+                              onDuplicated={newCol => setListColumns(prev => [...prev, newCol])}
+                            />
                           </div>
                         </th>
                       ))}
@@ -1594,59 +2272,16 @@ function TaskListSection({ list: initialList, projectId, projectName = '', colum
         </>
       )}
 
-      {/* Create task dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New Task — {list.name}</DialogTitle>
-            <DialogDescription>Fill in the task details below.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCreateTask} className="mt-4 space-y-4">
-            <div className="space-y-1.5">
-              <Label>Task Name</Label>
-              <Input
-                value={newTask.name}
-                onChange={(e) => setNewTask((p) => ({ ...p, name: e.target.value }))}
-                placeholder="e.g. Balance drum levels"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Due Date</Label>
-                <Input
-                  type="date"
-                  value={newTask.due_date}
-                  onChange={(e) => setNewTask((p) => ({ ...p, due_date: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Status</Label>
-                <Select
-                  value={newTask.status}
-                  onValueChange={(v) => setNewTask((p) => ({ ...p, status: v }))}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {statuses.map(s => (
-                      <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {createError && <p className="text-sm text-red-600">{createError}</p>}
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={creating}>
-                {creating ? 'Creating…' : 'Create Task'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Create task modal */}
+      <RichTaskCreateModal
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        list={list}
+        statuses={statuses}
+        listColumns={listColumns}
+        projectMembers={members}
+        onCreated={handleRichTaskCreated}
+      />
 
       {/* Task detail drawer */}
       <TaskDrawer
@@ -1664,27 +2299,6 @@ function TaskListSection({ list: initialList, projectId, projectName = '', colum
         onColValuesSaved={handleColValuesSaved}
         columns={columns}
       />
-
-      {/* Column settings dialog */}
-      {settingsCol && (
-        <ColumnSettingsDialog
-          column={settingsCol}
-          open={settingsOpen}
-          onOpenChange={setSettingsOpen}
-          onUpdated={updated => setListColumns(prev => prev.map(c => c.id === updated.id ? updated : c))}
-          onDeleted={colId => {
-            setListColumns(prev => prev.filter(c => c.id !== colId));
-            setColValues(prev => {
-              const next = { ...prev };
-              for (const taskId of Object.keys(next)) {
-                const { [colId]: _, ...rest } = next[taskId];
-                next[taskId] = rest;
-              }
-              return next;
-            });
-          }}
-        />
-      )}
 
       {/* Delete list confirmation */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -1998,76 +2612,93 @@ export function ProjectDetail() {
                 {project.description}
               </p>
             )}
-            {project?.members?.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {project.members.map((m) => (
-                  <span
-                    key={m.id}
-                    className="rounded-full bg-[hsl(var(--muted))] px-2.5 py-0.5 text-xs font-medium"
-                  >
-                    {m.username}
-                    {m.role === 'admin' && (
-                      <span className="ml-1 text-[#0066CC]">·admin</span>
-                    )}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
-          <div className="flex gap-1.5 shrink-0">
-            <Button size="sm" variant="outline" title="Share" onClick={() => setShareOpen(true)}>
-              <Share2 className="h-4 w-4" />
-              <span className="hidden lg:inline">Share</span>
-            </Button>
-            {isAdmin && (
-              <>
-                <Button size="sm" variant="outline" title="Customize Columns" onClick={() => { setEditCols(columns.map(c => ({ ...c }))); setColDialogOpen(true); }}>
-                  <Columns3 className="h-4 w-4" />
-                  <span className="hidden lg:inline">Columns</span>
-                </Button>
-                <Button size="sm" variant="outline" title="Manage Statuses" onClick={() => setStatusDialogOpen(true)}>
-                  <CircleDot className="h-4 w-4" />
-                  <span className="hidden lg:inline">Statuses</span>
-                </Button>
-                <Button size="sm" variant="outline" title="Invite Member" onClick={() => { setInviteLink(''); setInviteOpen(true); }}>
-                  <Mail className="h-4 w-4" />
-                  <span className="hidden lg:inline">Invite</span>
-                </Button>
+          {/* Share & Invite — merged icon button with popover */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Popover>
+              <PopoverTrigger asChild>
                 <button
-                  onClick={() => setCreateListOpen(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md bg-white dark:bg-[#1A1A1A] border border-[#E5E5E5] dark:border-[#2E2E2E] text-[#111111] dark:text-[#F5F5F5] hover:bg-[#F5F5F5] dark:hover:bg-[#242424]"
+                  title="Share & Invite"
+                  className="flex items-center justify-center rounded-full bg-[var(--surface)] border border-[var(--border-color)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-hover)] shadow-[var(--shadow-sm)]"
+                  style={{ width: 36, height: 36 }}
                 >
-                  <ListPlus className="w-4 h-4" />
-                  <span>New List</span>
+                  <MoreHorizontal className="h-[18px] w-[18px]" />
                 </button>
-              </>
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={8} className="w-44 p-1">
+                <button
+                  onClick={() => setShareOpen(true)}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+                >
+                  <Share2 className="h-4 w-4 text-[var(--text-muted)]" />
+                  Share board
+                </button>
+                <button
+                  onClick={() => { setInviteLink(''); setInviteOpen(true); }}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+                >
+                  <UserPlus className="h-4 w-4 text-[var(--text-muted)]" />
+                  Invite member
+                </button>
+              </PopoverContent>
+            </Popover>
+
+            {isAdmin && (
+              <button
+                onClick={() => setCreateListOpen(true)}
+                style={{
+                  background: 'var(--brand-primary)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: 'var(--radius-full)',
+                  height: '36px',
+                  padding: '0 16px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  transition: 'background 150ms ease',
+                  fontFamily: 'var(--font-sans)',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--brand-primary-hover)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'var(--brand-primary)'}
+              >
+                <ListPlus style={{ width: 16, height: 16, color: '#FFFFFF' }} />
+                <span>New List</span>
+              </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* View Switcher */}
-      <div className="flex items-center gap-0 border-b border-[hsl(var(--border))] mb-5">
-        {[
-          { key: 'list',  label: 'List',  Icon: List },
-          { key: 'board', label: 'Board', Icon: LayoutGrid },
-          { key: 'gantt', label: 'Gantt', Icon: GanttChartSquare },
-        ].map(({ key, label, Icon }) => (
-          <button
-            key={key}
-            onClick={() => switchView(key)}
-            className={[
-              'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-all duration-150',
-              'border-b-2 -mb-[2px]',
-              view === key
-                ? 'border-[#0066CC] text-[#0066CC]'
-                : 'border-transparent text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]',
-            ].join(' ')}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </button>
-        ))}
+      {/* View Switcher + Columns/Statuses toolbar */}
+      <div className="flex items-center justify-between border-b border-[hsl(var(--border))] mb-5 gap-2">
+        {/* Left: List / Board / Gantt tabs */}
+        <div className="flex items-center">
+          {[
+            { key: 'list',  label: 'List',  Icon: List },
+            { key: 'board', label: 'Board', Icon: LayoutGrid },
+            { key: 'gantt', label: 'Gantt', Icon: GanttChartSquare },
+          ].map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              onClick={() => switchView(key)}
+              className={[
+                'flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-all duration-150',
+                'border-b-2 -mb-[1px]',
+                view === key
+                  ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                  : 'border-transparent text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]',
+              ].join(' ')}
+            >
+              <Icon className="h-4 w-4" />
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
+        </div>
+
       </div>
 
       {/* View content with fade transition */}
@@ -2103,6 +2734,7 @@ export function ProjectDetail() {
 
         {view === 'board' && (
           <>
+            <div className="overflow-x-auto max-w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
             <KanbanBoard
               taskLists={taskLists}
               statuses={statuses}
@@ -2113,6 +2745,7 @@ export function ProjectDetail() {
               onListDeleted={(listId) => setTaskLists(prev => prev.filter(l => l.id !== listId))}
               onListCreated={(newList) => setTaskLists(prev => [...prev, newList])}
             />
+            </div>
             <TaskDrawer
               taskId={boardSheetTaskId}
               projectId={parseInt(id)}
@@ -2203,7 +2836,7 @@ export function ProjectDetail() {
                   disabled={col.column_key === 'name'}
                   onClick={() => setEditCols(prev => prev.map(c => c.column_key === col.column_key ? { ...c, visible: c.visible ? 0 : 1 } : c))}
                   className={`h-5 w-5 shrink-0 rounded border-2 transition-colors flex items-center justify-center
-                    ${col.visible ? 'border-[#0066CC] bg-[#0066CC]' : 'border-[hsl(var(--muted-foreground))] bg-transparent'}
+                    ${col.visible ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]' : 'border-[hsl(var(--muted-foreground))] bg-transparent'}
                     ${col.column_key === 'name' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                 >
                   {col.visible ? <Check className="h-3 w-3 text-white" /> : null}

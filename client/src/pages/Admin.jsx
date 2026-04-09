@@ -569,8 +569,8 @@ export function Admin() {
   return (
     <>
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0066CC]/10">
-          <Shield className="h-5 w-5 text-[#0066CC]" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--brand-primary)]/10">
+          <Shield className="h-5 w-5 text-[var(--brand-primary)]" />
         </div>
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-[#1a1a2e] dark:text-white">Admin Panel</h1>

@@ -42,7 +42,7 @@ const TYPE_ICON = {
 };
 const TYPE_COLOR = {
   assignment: 'bg-blue-500',
-  comment: 'bg-[#0066CC]',
+  comment: 'bg-[var(--brand-primary)]',
   status: 'bg-green-500',
   info: 'bg-gray-400',
 };
@@ -72,7 +72,7 @@ function NotifRow({ n, onClickRow }) {
         <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{timeAgo(n.created_at)}</p>
       </div>
       {!n.read && (
-        <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[#0066CC]" aria-label="Unread" />
+        <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--brand-primary)]" aria-label="Unread" />
       )}
     </button>
   );

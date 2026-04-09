@@ -20,7 +20,7 @@ function timeAgo(dateStr) {
 
 const TYPE_COLORS = {
   assignment: 'bg-blue-500',
-  comment: 'bg-[#0066CC]',
+  comment: 'bg-[var(--brand-primary)]',
   status: 'bg-green-500',
 };
 
@@ -83,7 +83,7 @@ export function Navbar({ darkMode, onToggleDark, unreadMessages = 0, onOpenChat 
             <Button variant="ghost" size="icon" aria-label="Chat" className="relative" onClick={onOpenChat}>
               <MessageSquareText className="h-4 w-4" />
               {unreadMessages > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#0066CC] text-[10px] font-bold text-white">
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--brand-primary)] text-[10px] font-bold text-white">
                   {unreadMessages > 9 ? '9+' : unreadMessages}
                 </span>
               )}
@@ -147,7 +147,7 @@ export function Navbar({ darkMode, onToggleDark, unreadMessages = 0, onOpenChat 
                               </p>
                             </div>
                             {!n.read && (
-                              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#0066CC]" />
+                              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--brand-primary)]" />
                             )}
                           </div>
                         </button>

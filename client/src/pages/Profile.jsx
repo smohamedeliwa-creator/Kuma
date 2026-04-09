@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CheckCircle2, Clock, Circle, AlertCircle,
-  MessageSquare, FolderOpen, Pencil,
+  MessageSquare, FolderOpen, Pencil, Palette, Sun, Moon, Monitor,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,9 +20,42 @@ import {
 } from '@/components/ui/dialog';
 
 const AVATAR_COLORS = [
-  '#0066CC', '#1A1A2E', '#059669', '#DC2626',
+  '#2EC4B6', '#1A1A2E', '#059669', '#DC2626',
   '#D97706', '#0891B2', '#BE185D', '#65A30D',
 ];
+
+const BRAND_PRESETS = [
+  { color: '#2EC4B6', label: 'Teal (default)' },
+  { color: 'var(--brand-primary)', label: 'Blue' },
+  { color: '#7C3AFF', label: 'Purple' },
+  { color: '#FF6B6B', label: 'Coral' },
+  { color: '#F59E0B', label: 'Amber' },
+  { color: '#22C55E', label: 'Green' },
+  { color: '#EC4899', label: 'Pink' },
+  { color: '#6B7280', label: 'Gray' },
+];
+
+function applyBrandColor(hex) {
+  if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return;
+  document.documentElement.style.setProperty('--brand-primary', hex);
+  // Derive a slightly darker hover variant
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const darken = v => Math.max(0, Math.round(v * 0.85)).toString(16).padStart(2, '0');
+  document.documentElement.style.setProperty('--brand-primary-hover', `#${darken(r)}${darken(g)}${darken(b)}`);
+  // Light variant (blend toward white at 90%)
+  const lighten = v => Math.min(255, Math.round(v + (255 - v) * 0.88)).toString(16).padStart(2, '0');
+  document.documentElement.style.setProperty('--brand-primary-light', `#${lighten(r)}${lighten(g)}${lighten(b)}`);
+}
+
+function applyThemeMode(mode, setDark) {
+  if (mode === 'dark') { setDark(true); return; }
+  if (mode === 'light') { setDark(false); return; }
+  // system
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  setDark(prefersDark);
+}
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -40,7 +73,7 @@ function StatCard({ icon, label, value, highlight }) {
   return (
     <Card>
       <CardContent className="flex items-center gap-4 pt-6">
-        <div className={`rounded-full p-2 ${highlight ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-[#0066CC]/10 text-[#0066CC]'}`}>
+        <div className={`rounded-full p-2 ${highlight ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]'}`}>
           {icon}
         </div>
         <div>
@@ -62,12 +95,23 @@ export function Profile() {
   const [selectedColor, setSelectedColor] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Theme state
+  const [brandColor, setBrandColor] = useState('#2EC4B6');
+  const [customHex, setCustomHex] = useState('#2EC4B6');
+  const [themeMode, setThemeMode] = useState('system');
+  const [savingTheme, setSavingTheme] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const res = await api.get('/api/profile');
       setData(res.data);
       setFullName(res.data.user.full_name || '');
       setSelectedColor(res.data.user.avatar_color || getAvatarColor(res.data.user.username));
+      const bc = res.data.user.brand_color || '#2EC4B6';
+      const tm = res.data.user.theme_mode || 'system';
+      setBrandColor(bc);
+      setCustomHex(bc);
+      setThemeMode(tm);
     } catch {
       toast({ title: 'Failed to load profile', variant: 'destructive' });
     } finally {
@@ -175,7 +219,7 @@ export function Profile() {
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <Link
                       to={`/projects/${p.id}`}
-                      className="font-medium hover:text-[#0066CC] transition-colors truncate"
+                      className="font-medium hover:text-[var(--brand-primary)] transition-colors truncate"
                     >
                       {p.name}
                     </Link>
@@ -210,7 +254,7 @@ export function Profile() {
                     <span className="font-medium">Commented</span> on{' '}
                     <Link
                       to={`/projects/${a.project_id}`}
-                      className="font-medium text-[#0066CC] hover:underline"
+                      className="font-medium text-[var(--brand-primary)] hover:underline"
                     >
                       {a.task_name}
                     </Link>
@@ -223,6 +267,134 @@ export function Profile() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Theme Personalization */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Palette className="h-4 w-4" />
+            Personalize your theme
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Brand Color */}
+          <div className="space-y-3">
+            <div>
+              <Label className="text-sm font-semibold">Brand color</Label>
+              <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">
+                Used for buttons, active states, and highlights across your workspace.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {BRAND_PRESETS.map(({ color }) => (
+                <button
+                  key={color}
+                  title={color}
+                  onClick={() => { setBrandColor(color); setCustomHex(color); applyBrandColor(color); }}
+                  className="h-8 w-8 rounded-full transition-transform hover:scale-110 focus:outline-none"
+                  style={{
+                    backgroundColor: color,
+                    outline: brandColor === color ? `3px solid ${color}` : '3px solid transparent',
+                    outlineOffset: '2px',
+                  }}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-2 max-w-[200px]">
+              <div
+                className="h-8 w-8 rounded-md border border-[hsl(var(--border))] shrink-0"
+                style={{ background: /^#[0-9A-Fa-f]{6}$/.test(customHex) ? customHex : '#ccc' }}
+              />
+              <Input
+                value={customHex}
+                onChange={e => {
+                  setCustomHex(e.target.value);
+                  if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
+                    setBrandColor(e.target.value);
+                    applyBrandColor(e.target.value);
+                  }
+                }}
+                placeholder="#2EC4B6"
+                className="font-mono text-sm"
+                maxLength={7}
+              />
+            </div>
+          </div>
+
+          {/* Theme Mode */}
+          <div className="space-y-3">
+            <Label className="text-sm font-semibold">Appearance</Label>
+            <div className="flex gap-3 flex-wrap">
+              {[
+                { value: 'light', label: 'Light', Icon: Sun },
+                { value: 'dark',  label: 'Dark',  Icon: Moon },
+                { value: 'system',label: 'System', Icon: Monitor },
+              ].map(({ value, label, Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => setThemeMode(value)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                    themeMode === value
+                      ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-light)] text-[var(--brand-primary)]'
+                      : 'border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className="rounded-xl border border-[hsl(var(--border))] p-4 space-y-3">
+            <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Preview</p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                className="rounded-full px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-85"
+                style={{ background: brandColor }}
+              >
+                Get started
+              </button>
+              <div
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
+                style={{ background: /^#[0-9A-Fa-f]{6}$/.test(brandColor)
+                  ? `${brandColor}22` : '#2EC4B622',
+                  color: brandColor }}
+              >
+                ● Active item
+              </div>
+              <span
+                className="rounded-full px-3 py-1 text-xs font-semibold"
+                style={{ background: /^#[0-9A-Fa-f]{6}$/.test(brandColor)
+                  ? `${brandColor}22` : '#2EC4B622',
+                  color: brandColor }}
+              >
+                Badge
+              </span>
+            </div>
+          </div>
+
+          <Button
+            onClick={async () => {
+              setSavingTheme(true);
+              try {
+                await api.put('/api/users/theme', { brandColor, themeMode });
+                localStorage.setItem('weave_brand_color', brandColor);
+                localStorage.setItem('weave_theme_mode', themeMode);
+                toast({ title: 'Theme saved' });
+              } catch {
+                toast({ title: 'Failed to save theme', variant: 'destructive' });
+              } finally {
+                setSavingTheme(false);
+              }
+            }}
+            disabled={savingTheme}
+          >
+            {savingTheme ? 'Saving...' : 'Save theme'}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Edit Profile Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

@@ -133,12 +133,12 @@ export function ShareDialog({ open, onClose, type, referenceId, isAdmin }) {
 
         {loading ? (
           <div className="flex items-center justify-center py-10">
-            <div className="h-6 w-6 animate-spin rounded-full border-4 border-[#0066CC] border-t-transparent" />
+            <div className="h-6 w-6 animate-spin rounded-full border-4 border-[var(--brand-primary)] border-t-transparent" />
           </div>
         ) : !shareData ? (
           <div className="py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
             Could not generate link.{' '}
-            <button className="text-[#0066CC] underline" onClick={fetchLink}>Try again</button>
+            <button className="text-[var(--brand-primary)] underline" onClick={fetchLink}>Try again</button>
           </div>
         ) : (
           <div className="space-y-5 pt-1">
@@ -172,7 +172,7 @@ export function ShareDialog({ open, onClose, type, referenceId, isAdmin }) {
                   placeholder="email@example.com"
                   value={emailInput}
                   onChange={e => setEmailInput(e.target.value)}
-                  className="flex-1 rounded-md border bg-[hsl(var(--background))] px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-[#0066CC]"
+                  className="flex-1 rounded-md border bg-[hsl(var(--background))] px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
                 />
                 <Button size="sm" variant="outline" onClick={handleEmail} disabled={!emailInput}>
                   <Mail className="h-3.5 w-3.5 mr-1" /> Send
@@ -217,7 +217,7 @@ export function ShareDialog({ open, onClose, type, referenceId, isAdmin }) {
                     aria-checked={!!shareData.enabled}
                     role="switch"
                     className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-                      shareData.enabled ? 'bg-[#0066CC]' : 'bg-[hsl(var(--muted-foreground))]'
+                      shareData.enabled ? 'bg-[var(--brand-primary)]' : 'bg-[hsl(var(--muted-foreground))]'
                     }`}
                   >
                     <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${

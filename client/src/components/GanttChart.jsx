@@ -374,7 +374,7 @@ export function GanttChart({ taskLists, statuses, projectId, onOpenTask }) {
               className={[
                 'rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors',
                 zoom === z
-                  ? 'bg-[#0066CC] text-white'
+                  ? 'bg-[var(--brand-primary)] text-white'
                   : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]',
               ].join(' ')}
             >
@@ -420,7 +420,7 @@ export function GanttChart({ taskLists, statuses, projectId, onOpenTask }) {
                       style={{ height: ROW_HEIGHT }}
                       onClick={() => onOpenTask(task.id)}
                     >
-                      <span className="text-xs truncate text-[hsl(var(--foreground))] group-hover:text-[#0066CC]">
+                      <span className="text-xs truncate text-[hsl(var(--foreground))] group-hover:text-[var(--brand-primary)]">
                         {task.name}
                       </span>
                       <Calendar className="h-3 w-3 shrink-0 text-[hsl(var(--muted-foreground))] opacity-0 group-hover:opacity-100 ml-auto" />
@@ -452,7 +452,7 @@ export function GanttChart({ taskLists, statuses, projectId, onOpenTask }) {
                     style={{ height: ROW_HEIGHT }}
                     onClick={() => onOpenTask(task.id)}
                   >
-                    <span className="text-xs truncate text-[hsl(var(--muted-foreground))] group-hover:text-[#0066CC]">
+                    <span className="text-xs truncate text-[hsl(var(--muted-foreground))] group-hover:text-[var(--brand-primary)]">
                       {task.name}
                     </span>
                   </div>

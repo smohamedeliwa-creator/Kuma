@@ -24,7 +24,7 @@ export function Layout() {
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#0066CC] border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--brand-primary)] border-t-transparent" />
       </div>
     );
   }
@@ -32,7 +32,7 @@ export function Layout() {
   if (!user) return <Navigate to="/login" replace />;
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))]">
+    <div className="min-h-screen bg-[hsl(var(--background))] overflow-x-hidden">
       <SideNav
         collapsed={collapsed}
         onCollapsedChange={handleCollapsedChange}
@@ -44,7 +44,7 @@ export function Layout() {
       <main
         style={{ transition: 'padding-left 200ms ease' }}
         className={[
-          'min-h-screen px-4 pb-8 pt-16 sm:px-6 lg:pt-8',
+          'min-h-screen px-4 pb-8 pt-16 sm:px-6 lg:pt-8 overflow-x-hidden',
           collapsed ? 'lg:pl-[76px]' : 'lg:pl-[276px]',
         ].join(' ')}
       >

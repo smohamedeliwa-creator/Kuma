@@ -418,8 +418,9 @@ app.put('/api/columns/:id', requireAdmin, (req, res) => {
   if (!col) return res.status(404).json({ error: 'Column not found' });
   const newName = (req.body.name !== undefined) ? (req.body.name.trim() || col.name) : col.name;
   if (newName.length > MAX_COL_NAME_LEN) return res.status(400).json({ error: `Column name must be ${MAX_COL_NAME_LEN} characters or fewer` });
+  const newType = (req.body.type !== undefined) ? req.body.type : col.type;
   const newConfig = (req.body.config !== undefined) ? JSON.stringify(req.body.config) : col.config;
-  db.prepare('UPDATE list_columns SET name = ?, config = ? WHERE id = ?').run(newName, newConfig, colId);
+  db.prepare('UPDATE list_columns SET name = ?, type = ?, config = ? WHERE id = ?').run(newName, newType, newConfig, colId);
   const updated = db.prepare('SELECT * FROM list_columns WHERE id = ?').get(colId);
   res.json({ ...updated, config: JSON.parse(updated.config) });
 });
@@ -1004,7 +1005,7 @@ app.delete('/api/comments/:id', requireAuth, (req, res) => {
 app.get('/api/profile', requireAuth, (req, res) => {
   const userId = req.session.userId;
 
-  const user = db.prepare('SELECT id, username, role, full_name, avatar_color, created_at FROM users WHERE id = ?').get(userId);
+  const user = db.prepare('SELECT id, username, role, full_name, avatar_color, brand_color, theme_mode, created_at FROM users WHERE id = ?').get(userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   // Task counts by status
@@ -1071,7 +1072,29 @@ app.put('/api/profile', requireAuth, (req, res) => {
   db.prepare('UPDATE users SET full_name = ?, avatar_color = ? WHERE id = ?')
     .run(full_name?.trim() || null, avatar_color || null, userId);
 
-  const user = db.prepare('SELECT id, username, role, full_name, avatar_color, created_at FROM users WHERE id = ?').get(userId);
+  const user = db.prepare('SELECT id, username, role, full_name, avatar_color, brand_color, theme_mode, created_at FROM users WHERE id = ?').get(userId);
+  res.json(user);
+});
+
+app.put('/api/users/theme', requireAuth, (req, res) => {
+  const userId = req.session.userId;
+  const { brandColor, themeMode } = req.body;
+  const validModes = ['light', 'dark', 'system'];
+
+  if (brandColor && !/^#[0-9A-Fa-f]{6}$/.test(brandColor))
+    return res.status(400).json({ error: 'Invalid hex color' });
+  if (themeMode && !validModes.includes(themeMode))
+    return res.status(400).json({ error: 'Invalid theme mode' });
+
+  const fields = [];
+  const vals = [];
+  if (brandColor !== undefined) { fields.push('brand_color = ?'); vals.push(brandColor); }
+  if (themeMode !== undefined)  { fields.push('theme_mode = ?');  vals.push(themeMode); }
+  if (fields.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+
+  vals.push(userId);
+  db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...vals);
+  const user = db.prepare('SELECT id, username, role, full_name, avatar_color, brand_color, theme_mode, created_at FROM users WHERE id = ?').get(userId);
   res.json(user);
 });
 
@@ -2252,18 +2275,26 @@ app.post('/api/pages/:pageId/blocks/upload', requireAuth, upload.single('file'),
 
 // ─── Static Files (after API routes so POST /api/* isn't blocked) ────────────
 const clientDist = path.join(__dirname, 'client', 'dist');
-// Hashed asset filenames (JS/CSS) can be cached for 1 year; index.html must never be cached
+
+// Landing page at root — must come before express.static so it isn't shadowed by index.html
+app.get('/', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(clientDist, 'landing.html'));
+});
+
+// Hashed asset filenames (JS/CSS) can be cached for 1 year; HTML must never be cached
 app.use(express.static(clientDist, {
   maxAge: '1y',
   etag: true,
+  index: false, // disable auto-serving index.html for directories
   setHeaders(res, filePath) {
-    // Never cache index.html so the browser always fetches fresh entry point
-    if (filePath.endsWith('index.html')) {
+    if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     }
   },
 }));
-// SPA fallback: serve React index.html for all non-API routes
+
+// SPA fallback: /app, /login, and all other non-API routes serve the React app
 app.get('/{*splat}', (_req, res) => {
   res.sendFile(path.join(clientDist, 'index.html'));
 });

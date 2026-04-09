@@ -176,7 +176,7 @@ function KanbanColumn({
         'flex flex-col rounded-xl border transition-all duration-150',
         'w-[280px] shrink-0',
         isOver
-          ? 'border-[#0066CC] bg-[#E6F0FF]/60 dark:bg-[#0A1628]/60 ring-2 ring-[#0066CC]/20'
+          ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-light)]/60 dark:bg-[var(--brand-primary-light)]/60 ring-2 ring-[var(--brand-primary)]/20'
           : 'border-[hsl(var(--border))] bg-[hsl(var(--muted))]/50',
       ].join(' ')}
       style={{ minHeight: 120 }}
@@ -242,7 +242,7 @@ function KanbanColumn({
             <div className={[
               'flex flex-col items-center justify-center rounded-lg border-2 border-dashed py-6 text-center transition-colors duration-150',
               isOver
-                ? 'border-[#0066CC] bg-[#0066CC]/5'
+                ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]/5'
                 : 'border-[hsl(var(--border))]',
             ].join(' ')}>
               <p className="text-xs text-[hsl(var(--muted-foreground))]">
@@ -251,7 +251,7 @@ function KanbanColumn({
               {isAdmin && !isOver && (
                 <button
                   onClick={onAddTask}
-                  className="mt-2 text-xs text-[#0066CC] hover:underline flex items-center gap-1"
+                  className="mt-2 text-xs text-[var(--brand-primary)] hover:underline flex items-center gap-1"
                 >
                   <Plus className="h-3 w-3" />
                   Add Task
@@ -322,7 +322,7 @@ function QuickAddTaskInline({ listId, statuses, onCreated, onCancel }) {
           onChange={e => setName(e.target.value)}
           onKeyDown={e => e.key === 'Escape' && onCancel()}
           placeholder="Task name…"
-          className="w-full rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#0066CC]/30"
+          className="w-full rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/30"
         />
         <div className="flex items-center gap-2 justify-end">
           <button type="button" onClick={onCancel} className="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]">
@@ -371,7 +371,7 @@ function RenameListInline({ list, onRenamed, onCancel }) {
         onBlur={handleSubmit}
         onKeyDown={e => e.key === 'Escape' && onCancel()}
         disabled={saving}
-        className="h-7 flex-1 min-w-0 rounded border bg-[hsl(var(--background))] px-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-[#0066CC]/30"
+        className="h-7 flex-1 min-w-0 rounded border bg-[hsl(var(--background))] px-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/30"
       />
     </form>
   );
@@ -581,7 +581,7 @@ export function KanbanBoard({ taskLists, statuses, isAdmin, projectId, onOpenTas
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <p className="text-lg font-semibold">No lists yet</p>
         {isAdmin && (
-          <button onClick={handleCreateList} className="mt-3 text-sm text-[#0066CC] hover:underline">
+          <button onClick={handleCreateList} className="mt-3 text-sm text-[var(--brand-primary)] hover:underline">
             + Add a column
           </button>
         )}
@@ -644,7 +644,7 @@ export function KanbanBoard({ taskLists, statuses, isAdmin, projectId, onOpenTas
           <div className="shrink-0 flex items-start">
             <button
               onClick={handleCreateList}
-              className="flex items-center gap-2 rounded-xl border-2 border-dashed border-[hsl(var(--border))] px-5 py-3 text-sm text-[hsl(var(--muted-foreground))] hover:border-[#0066CC] hover:text-[#0066CC] transition-colors"
+              className="flex items-center gap-2 rounded-xl border-2 border-dashed border-[hsl(var(--border))] px-5 py-3 text-sm text-[hsl(var(--muted-foreground))] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] transition-colors"
               style={{ minHeight: 64 }}
             >
               <Plus className="h-4 w-4" />

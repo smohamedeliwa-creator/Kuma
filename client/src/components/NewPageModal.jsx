@@ -97,13 +97,13 @@ export function NewPageModal({ open, onClose, onCreated, parentId = null, projec
               <button
                 onClick={createBlank}
                 disabled={creating}
-                className="flex flex-col items-center gap-3 rounded-xl border-2 border-[hsl(var(--border))] p-6 text-center transition-all hover:border-[#0066CC] hover:bg-[#E6F0FF]/30 dark:hover:bg-[#0A1628]/30 group disabled:opacity-50"
+                className="flex flex-col items-center gap-3 rounded-xl border-2 border-[hsl(var(--border))] p-6 text-center transition-all hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary-light)]/30 dark:hover:bg-[var(--brand-primary-light)]/30 group disabled:opacity-50"
               >
-                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[hsl(var(--muted))] group-hover:bg-[#0066CC]/10 transition-colors">
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[hsl(var(--muted))] group-hover:bg-[var(--brand-primary)]/10 transition-colors">
                   {creating ? (
-                    <Loader2 className="h-7 w-7 animate-spin text-[#0066CC]" />
+                    <Loader2 className="h-7 w-7 animate-spin text-[var(--brand-primary)]" />
                   ) : (
-                    <FileText className="h-7 w-7 text-[hsl(var(--muted-foreground))] group-hover:text-[#0066CC] transition-colors" />
+                    <FileText className="h-7 w-7 text-[hsl(var(--muted-foreground))] group-hover:text-[var(--brand-primary)] transition-colors" />
                   )}
                 </div>
                 <div>
@@ -116,10 +116,10 @@ export function NewPageModal({ open, onClose, onCreated, parentId = null, projec
               <button
                 onClick={() => setStep('templates')}
                 disabled={creating}
-                className="flex flex-col items-center gap-3 rounded-xl border-2 border-[hsl(var(--border))] p-6 text-center transition-all hover:border-[#0066CC] hover:bg-[#E6F0FF]/30 dark:hover:bg-[#0A1628]/30 group disabled:opacity-50"
+                className="flex flex-col items-center gap-3 rounded-xl border-2 border-[hsl(var(--border))] p-6 text-center transition-all hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary-light)]/30 dark:hover:bg-[var(--brand-primary-light)]/30 group disabled:opacity-50"
               >
-                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[hsl(var(--muted))] group-hover:bg-[#0066CC]/10 transition-colors">
-                  <LayoutTemplate className="h-7 w-7 text-[hsl(var(--muted-foreground))] group-hover:text-[#0066CC] transition-colors" />
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[hsl(var(--muted))] group-hover:bg-[var(--brand-primary)]/10 transition-colors">
+                  <LayoutTemplate className="h-7 w-7 text-[hsl(var(--muted-foreground))] group-hover:text-[var(--brand-primary)] transition-colors" />
                 </div>
                 <div>
                   <p className="font-semibold text-[hsl(var(--foreground))]">Use template</p>
@@ -140,9 +140,9 @@ export function NewPageModal({ open, onClose, onCreated, parentId = null, projec
                   onClick={() => applyTemplate(tpl)}
                   disabled={creating}
                   className={[
-                    'flex flex-col gap-3 rounded-xl border-2 p-4 text-left transition-all hover:border-[#0066CC] hover:shadow-sm disabled:opacity-50',
+                    'flex flex-col gap-3 rounded-xl border-2 p-4 text-left transition-all hover:border-[var(--brand-primary)] hover:shadow-sm disabled:opacity-50',
                     selectedTemplate === tpl.id
-                      ? 'border-[#0066CC] bg-[#E6F0FF]/30 dark:bg-[#0A1628]/30'
+                      ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-light)]/30 dark:bg-[var(--brand-primary-light)]/30'
                       : 'border-[hsl(var(--border))]',
                   ].join(' ')}
                 >
@@ -166,7 +166,7 @@ export function NewPageModal({ open, onClose, onCreated, parentId = null, projec
                   <div>
                     <div className="flex items-center gap-1.5">
                       {selectedTemplate === tpl.id && creating && (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#0066CC]" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--brand-primary)]" />
                       )}
                       <p className="font-semibold text-sm text-[hsl(var(--foreground))]">{tpl.name}</p>
                     </div>

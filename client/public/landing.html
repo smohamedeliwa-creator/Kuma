@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weave — The only work tool your team needs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --lp-sky: #D6E8F7;
+      --lp-beige: #E8D9C8;
+      --lp-cream: #F5F0EA;
+      --lp-white: #FFFFFF;
+      --lp-dark: #0F1923;
+      --lp-gray: #555555;
+      --lp-muted: #999999;
+      --lp-border: #E5E7EB;
+      --lp-teal: #2EC4B6;
+      --lp-teal-light: #E0F7F5;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-feature-settings: "cv11","ss01";
+      letter-spacing: -0.01em;
+      color: var(--lp-dark);
+      background: var(--lp-white);
+      overflow-x: hidden;
+    }
+
+    a { text-decoration: none; color: inherit; }
+    img { display: block; max-width: 100%; }
+
+    /* ── Scroll animations ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 500ms ease-out, transform 500ms ease-out;
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: transparent;
+      border-bottom: 1px solid transparent;
+      transition: background 250ms ease,
+                  padding 250ms ease,
+                  border-color 250ms ease,
+                  backdrop-filter 250ms ease;
+      padding: 20px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-logo-mark svg { display: block; }
+    .nav-logo-icon { display: flex; align-items: center; flex-shrink: 0; }
+
+    .nav-scrolled {
+      background: rgba(245,240,234,0.82);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(209,200,188,0.45);
+      padding: 12px 48px;
+    }
+
+    .nav-wordmark {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--lp-dark);
+      letter-spacing: -0.02em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 14px;
+      color: var(--lp-gray);
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--lp-dark); }
+
+    .nav-cta {
+      background: var(--lp-dark);
+      color: white;
+      border-radius: 100px;
+      padding: 10px 22px;
+      font-size: 14px;
+      font-weight: 500;
+      font-family: inherit;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .nav-cta:hover { opacity: 0.85; }
+
+    .nav-hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      cursor: pointer;
+      padding: 4px;
+      background: none;
+      border: none;
+    }
+    .nav-hamburger span {
+      display: block;
+      width: 20px;
+      height: 2px;
+      background: var(--lp-dark);
+      border-radius: 2px;
+    }
+
+    .mobile-menu {
+      display: none;
+      position: fixed;
+      top: 60px;
+      left: 0;
+      right: 0;
+      background: rgba(214,232,247,0.97);
+      backdrop-filter: blur(12px);
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--lp-border);
+      z-index: 99;
+      flex-direction: column;
+      gap: 0;
+    }
+    .mobile-menu.open { display: flex; }
+    .mobile-menu a {
+      font-size: 15px;
+      color: var(--lp-gray);
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(229,231,235,0.4);
+    }
+    .mobile-menu a:last-child { border-bottom: none; margin-top: 8px; }
+
+    /* ── HERO ── */
+    .hero {
+      background: linear-gradient(180deg, var(--lp-sky) 0%, var(--lp-beige) 100%);
+      padding: 120px 48px 0;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cloud {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .cloud-left {
+      left: -20px;
+      top: 60px;
+      width: 260px;
+      height: 130px;
+      background: radial-gradient(ellipse, rgba(255,255,255,0.75) 0%, transparent 80%);
+    }
+    .cloud-right {
+      right: -20px;
+      top: 60px;
+      width: 260px;
+      height: 130px;
+      background: radial-gradient(ellipse, rgba(255,255,255,0.75) 0%, transparent 80%);
+    }
+
+    .hero-eyebrow {
+      display: inline-block;
+      background: rgba(255,255,255,0.55);
+      border: 1px solid rgba(255,255,255,0.7);
+      border-radius: 100px;
+      padding: 5px 16px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--lp-gray);
+      letter-spacing: 0.02em;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      font-size: 58px;
+      font-weight: 800;
+      color: var(--lp-dark);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      max-width: 640px;
+      margin: 0 auto 20px;
+    }
+
+    .hero-sub {
+      font-size: 16px;
+      color: var(--lp-gray);
+      max-width: 500px;
+      margin: 0 auto 36px;
+      line-height: 1.6;
+    }
+
+    .hero-ctas {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 52px;
+    }
+
+    .btn-primary {
+      background: var(--lp-dark);
+      color: white;
+      border-radius: 100px;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 500;
+      font-family: inherit;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.6);
+      color: var(--lp-dark);
+      border-radius: 100px;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 500;
+      font-family: inherit;
+      border: 1px solid rgba(255,255,255,0.8);
+      cursor: pointer;
+      transition: background 0.2s;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.8); }
+
+    /* ── Hero Cinematic Mockup ── */
+    .hero-mock-wrap {
+      position: relative;
+      max-width: 900px;
+      margin: 0 auto;
+      animation: slideUpMock 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.7s both;
+    }
+
+    .hero-mock-glow {
+      position: absolute;
+      bottom: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60%;
+      height: 80px;
+      background: radial-gradient(ellipse, rgba(46,196,182,0.35) 0%, transparent 70%);
+      filter: blur(24px);
+      animation: glowPulse 3s ease-in-out infinite;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .hero-mock-fade {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 140px;
+      background: linear-gradient(to top, #E8D9C8 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .hero-mock-frame {
+      background: #fff;
+      border-radius: 14px 14px 0 0;
+      border: 1px solid #E5E7EB;
+      border-bottom: none;
+      overflow: hidden;
+      box-shadow:
+        0 -4px 20px rgba(0,0,0,0.06),
+        0 -24px 80px rgba(0,0,0,0.10);
+      position: relative;
+      z-index: 2;
+    }
+
+    .mock-browser-bar {
+      height: 40px;
+      background: #F5F5F5;
+      border-bottom: 1px solid #E5E7EB;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 6px;
+    }
+
+    .mock-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .mock-url-bar {
+      flex: 1;
+      height: 22px;
+      background: #EBEBEB;
+      border-radius: 6px;
+      margin-left: 10px;
+      max-width: 280px;
+    }
+
+    .hero-screenshot {
+      width: 100%;
+      display: block;
+      max-height: 520px;
+      object-fit: cover;
+      object-position: top;
+    }
+
+    /* ── Hero text entrance animations ── */
+    .hero-badge  { animation: fadeUp 0.8s ease-out 0.1s both; }
+    .hero-h1     { animation: fadeUp 0.8s ease-out 0.25s both; }
+    .hero-sub    { animation: fadeUp 0.8s ease-out 0.4s both; }
+    .hero-ctas   { animation: fadeUp 0.8s ease-out 0.55s both; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideUpMock {
+      from {
+        opacity: 0;
+        transform: translateY(100px) scale(0.96);
+        filter: blur(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+      }
+    }
+
+    @keyframes glowPulse {
+      0%, 100% { opacity: 0.6; transform: translateX(-50%) scaleX(1); }
+      50%       { opacity: 1;   transform: translateX(-50%) scaleX(1.15); }
+    }
+
+    @keyframes slideInLeft {
+      from { opacity: 0; transform: translateX(-40px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(40px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    /* Elements that use data-anim start hidden */
+    [data-anim] { opacity: 0; }
+
+    /* ── Section dividers ── */
+    .section-divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(
+        to right,
+        transparent 0%,
+        #D1C8BC 20%,
+        #D1C8BC 80%,
+        transparent 100%
+      );
+    }
+    .section-divider-subtle {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(
+        to right,
+        transparent 0%,
+        rgba(0,0,0,0.07) 20%,
+        rgba(0,0,0,0.07) 80%,
+        transparent 100%
+      );
+    }
+
+    /* ── LOGOS BAR ── */
+    .logos-bar {
+      background: var(--lp-cream);
+      padding: 28px 48px;
+      text-align: center;
+    }
+
+    .logos-label {
+      font-size: 13px;
+      color: var(--lp-muted);
+      margin-bottom: 16px;
+    }
+
+    .logos-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 40px;
+    }
+
+    .logo-text {
+      font-size: 15px;
+      font-weight: 600;
+      color: #BBBBBB;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── SECTIONS ── */
+    .section-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 48px;
+    }
+
+    /* ── FEATURE SECTIONS ── */
+    .feature-section {
+      padding: 80px 0;
+    }
+
+    .feature-section.bg-white { background: var(--lp-white); }
+    .feature-section.bg-cream { background: var(--lp-cream); }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+    }
+
+    .feature-grid.reversed { direction: rtl; }
+    .feature-grid.reversed > * { direction: ltr; }
+
+    .feature-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      color: var(--lp-muted);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .feature-headline {
+      font-size: 40px;
+      font-weight: 800;
+      color: var(--lp-dark);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+    }
+
+    .feature-body {
+      font-size: 15px;
+      color: var(--lp-gray);
+      line-height: 1.65;
+      margin-bottom: 28px;
+    }
+
+    .feature-cta {
+      background: var(--lp-dark);
+      color: white;
+      border-radius: 100px;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      font-family: inherit;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      display: inline-block;
+      margin-bottom: 24px;
+      text-decoration: none;
+    }
+    .feature-cta:hover { opacity: 0.85; }
+
+    .feature-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .feature-chip {
+      border: 1px solid var(--lp-border);
+      border-radius: 100px;
+      padding: 7px 14px;
+      font-size: 13px;
+      color: var(--lp-gray);
+      background: white;
+      font-weight: 500;
+    }
+
+    /* Feature visual containers */
+    .feature-visual {
+      border-radius: 20px;
+      padding: 20px;
+      background: linear-gradient(135deg, var(--lp-sky), var(--lp-beige));
+    }
+
+    .feature-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid var(--lp-border);
+    }
+
+    .feat-card-header {
+      font-size: 11px;
+      font-weight: 600;
+      color: #BBB;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .feat-task-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid #F5F5F5;
+    }
+    .feat-task-row:last-child { border-bottom: none; }
+
+    .feat-task-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .feat-task-bar {
+      flex: 1;
+      height: 8px;
+      background: #F0F0F0;
+      border-radius: 4px;
+    }
+
+    .feat-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 100px;
+    }
+    .fb-teal { background: var(--lp-teal-light); color: var(--lp-teal); }
+    .fb-yellow { background: #FEF9C3; color: #A16207; }
+    .fb-gray { background: #F3F4F6; color: #6B7280; }
+
+    /* Pages visual */
+    .pages-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--lp-border);
+    }
+
+    .page-title-line {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--lp-dark);
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #F0F0F0;
+    }
+
+    .page-text-line {
+      height: 9px;
+      background: #F0F0F0;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+
+    .page-tag-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 14px;
+    }
+
+    .page-tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 100px;
+    }
+    .pt-blue { background: #EFF6FF; color: #3B82F6; }
+    .pt-green { background: #F0FDF4; color: #22C55E; }
+    .pt-orange { background: #FFF7ED; color: #F97316; }
+
+    /* Chat visual */
+    .chat-card {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid var(--lp-border);
+      overflow: hidden;
+    }
+
+    .chat-header {
+      background: #FAFAFA;
+      border-bottom: 1px solid #F0F0F0;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--lp-dark);
+    }
+
+    .chat-body {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .chat-bubble {
+      max-width: 75%;
+      padding: 9px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .cb-received {
+      background: #F3F4F6;
+      color: var(--lp-dark);
+      align-self: flex-start;
+      border-radius: 4px 12px 12px 12px;
+    }
+
+    .cb-sent {
+      background: var(--lp-teal);
+      color: white;
+      align-self: flex-end;
+      border-radius: 12px 4px 12px 12px;
+    }
+
+    .cal-mini {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid var(--lp-border);
+      padding: 12px;
+      margin-top: 10px;
+    }
+
+    .cal-mini-header {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--lp-dark);
+      margin-bottom: 8px;
+    }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+
+    .cal-cell {
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      border-radius: 50%;
+      color: #888;
+    }
+    .cal-cell.today {
+      background: var(--lp-teal);
+      color: white;
+      font-weight: 700;
+    }
+    .cal-cell.has-event {
+      background: var(--lp-teal-light);
+      color: var(--lp-teal);
+      font-weight: 600;
+    }
+
+    /* ── TESTIMONIALS ── */
+    .testimonials {
+      background: var(--lp-cream);
+      padding: 80px 0;
+      text-align: center;
+    }
+
+    .big-quote {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--lp-dark);
+      max-width: 700px;
+      margin: 0 auto 16px;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+    }
+
+    .big-quote-attr {
+      font-size: 14px;
+      color: #777;
+      margin-bottom: 52px;
+    }
+
+    .testimonial-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      text-align: left;
+    }
+
+    .tcard {
+      background: white;
+      border-radius: 16px;
+      border: 1px solid var(--lp-border);
+      padding: 24px;
+    }
+
+    .tcard-quote {
+      font-size: 14px;
+      color: var(--lp-gray);
+      line-height: 1.65;
+      margin-bottom: 20px;
+    }
+
+    .tcard-author {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tcard-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--lp-dark);
+      flex-shrink: 0;
+    }
+
+    .tcard-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--lp-dark);
+      margin-bottom: 2px;
+    }
+
+    .tcard-role {
+      font-size: 12px;
+      color: var(--lp-muted);
+    }
+
+    /* ── PRICING ── */
+    /* ── Pricing section ── */
+    .pricing {
+      background: var(--lp-cream);
+      padding: 80px 0;
+    }
+
+    /* ── New split pricing card ── */
+    .pricing-main-card {
+      max-width: 1000px;
+      margin: 0 auto;
+      border-radius: 20px;
+      border: 1px solid var(--lp-border);
+      overflow: hidden;
+      display: flex;
+    }
+
+    .pcard-left {
+      width: 50%;
+      background: #FFFFFF;
+      padding: 52px 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .pcard-left-heading {
+      font-size: 28px;
+      font-weight: 700;
+      color: #0F1923;
+      letter-spacing: -0.02em;
+      margin: 0 0 16px;
+    }
+
+    .pcard-left-desc {
+      font-size: 15px;
+      color: #6B7280;
+      line-height: 1.6;
+      max-width: 340px;
+      margin: 0;
+    }
+
+    .pcard-bottom {
+      margin-top: 40px;
+    }
+
+    .pcard-price-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 0;
+    }
+
+    .pcard-price-amount {
+      font-size: 72px;
+      font-weight: 800;
+      color: #0F1923;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+
+    .pcard-price-suffix {
+      font-size: 16px;
+      color: #9A9AB0;
+      font-weight: 400;
+      margin-left: 8px;
+      padding-bottom: 10px;
+    }
+
+    .pcard-hr {
+      border: none;
+      border-top: 1px solid #E5E2F0;
+      margin: 20px 0;
+    }
+
+    .pcard-footnote {
+      font-size: 13px;
+      color: #9A9AB0;
+      margin: 0;
+    }
+
+    .pcard-right {
+      width: 50%;
+      background: #0F1923;
+      padding: 52px 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .pcard-right-header {
+      font-size: 16px;
+      font-weight: 600;
+      color: #FFFFFF;
+      margin: 0 0 32px;
+    }
+
+    .pcard-features-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 40px;
+      flex: 1;
+    }
+
+    .pcard-features-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 18px;
+      font-size: 15px;
+      color: rgba(255,255,255,0.85);
+      line-height: 1.5;
+    }
+
+    .pcard-features-list li .pplus {
+      font-size: 16px;
+      font-weight: 600;
+      color: #2EC4B6;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .pcard-btn-get {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      color: #0F1923;
+      border: none;
+      border-radius: 100px;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s;
+      align-self: flex-start;
+    }
+    .pcard-btn-get:hover { opacity: 0.88; }
+
+    /* ── FINAL CTA ── */
+    .final-cta {
+      background: linear-gradient(180deg, var(--lp-sky) 0%, #C8D8EC 100%);
+      padding: 100px 48px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .final-cta h2 {
+      font-size: 48px;
+      font-weight: 800;
+      color: var(--lp-dark);
+      letter-spacing: -0.03em;
+      margin-bottom: 14px;
+    }
+
+    .final-cta p {
+      font-size: 15px;
+      color: #666;
+      margin-bottom: 32px;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--lp-cream);
+      padding: 40px 48px 24px;
+    }
+
+    .footer-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 36px;
+      flex-wrap: wrap;
+      gap: 32px;
+    }
+
+    .footer-brand { max-width: 240px; }
+
+    .footer-tagline {
+      font-size: 13px;
+      color: var(--lp-muted);
+      line-height: 1.6;
+      margin-top: 10px;
+    }
+
+    .footer-links-row {
+      display: flex;
+      gap: 64px;
+      flex-wrap: wrap;
+    }
+
+    .footer-col-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--lp-dark);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .footer-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .footer-col a {
+      font-size: 13px;
+      color: var(--lp-muted);
+      transition: color 0.2s;
+    }
+    .footer-col a:hover { color: var(--lp-dark); }
+
+    .footer-bottom {
+      border-top: 1px solid var(--lp-border);
+      padding-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .footer-bottom span {
+      font-size: 12px;
+      color: #AAA;
+    }
+
+    /* ── Browser frame wrapper ── */
+    .screen-frame {
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid #E5E2F0;
+      box-shadow:
+        0 4px 24px rgba(26,26,46,0.08),
+        0 1px 4px rgba(26,26,46,0.04);
+      background: #fff;
+    }
+
+    .screen-frame-bar {
+      height: 38px;
+      background: #F5F5F8;
+      border-bottom: 1px solid #E5E2F0;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 6px;
+    }
+
+    .screen-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .screen-url-bar {
+      flex: 1;
+      height: 20px;
+      background: #EEEEF4;
+      border-radius: 6px;
+      margin-left: 8px;
+      max-width: 240px;
+    }
+
+    .screen-img {
+      width: 100%;
+      display: block;
+      object-fit: cover;
+      object-position: top;
+      max-height: 480px;
+    }
+
+    /* ── 3-screenshot showcase ── */
+    .showcase-section {
+      background: var(--lp-cream);
+      padding: 80px 0;
+      text-align: center;
+    }
+
+    .showcase-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 48px;
+    }
+
+    .showcase-item {}
+
+    .showcase-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--lp-muted);
+      text-align: center;
+      margin-top: 12px;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .showcase-grid { grid-template-columns: 1fr; }
+      nav { padding: 0 24px; }
+      .nav-links, .nav-cta { display: none; }
+      .nav-hamburger { display: flex; }
+
+      .hero { padding: 100px 24px 0; }
+      .hero h1 { font-size: 36px; }
+      .hero-sub { font-size: 15px; }
+
+      .mockup-sidebar { display: none; }
+      .mock-stats { grid-template-columns: repeat(2, 1fr); }
+
+      .logos-bar { padding: 24px; }
+      .logos-row { gap: 24px; }
+
+      .section-container { padding: 0 24px; }
+
+      .feature-section { padding: 56px 0; }
+      .feature-grid { grid-template-columns: 1fr; gap: 36px; }
+      .feature-grid.reversed { direction: ltr; }
+      .feature-headline { font-size: 30px; }
+
+      .testimonials { padding: 56px 0; }
+      .big-quote { font-size: 26px; }
+      .testimonial-cards { grid-template-columns: 1fr; }
+
+      .pricing { padding: 56px 0; }
+      .pricing-main-card { flex-direction: column; }
+      .pcard-left, .pcard-right { width: 100%; padding: 36px 28px; }
+      .pcard-price-amount { font-size: 56px; }
+      .pcard-left-heading { font-size: 22px; }
+
+      .final-cta { padding: 64px 24px; }
+      .final-cta h2 { font-size: 34px; }
+
+      footer { padding: 32px 24px 20px; }
+      .footer-links-row { gap: 32px; }
+      .footer-bottom { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAVIGATION ── -->
+<nav id="navbar">
+  <div class="nav-logo">
+    <div class="nav-logo-icon">
+      <svg viewBox="0 0 44 36" width="36" height="29" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 4 28 Q 22 8 40 28" stroke="#6C47FF" stroke-width="3" stroke-linecap="round"/>
+        <path d="M 8 22 Q 22 8 36 22" stroke="#6C47FF" stroke-width="3" stroke-linecap="round" opacity="0.65"/>
+        <path d="M 12 16 Q 22 6 32 16" stroke="#6C47FF" stroke-width="3" stroke-linecap="round" opacity="0.3"/>
+      </svg>
+    </div>
+    <span class="nav-wordmark">Weave</span>
+  </div>
+
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#benefits">Benefits</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#testimonials">Blog</a></li>
+    <li><a href="#footer">Contact</a></li>
+  </ul>
+
+  <a href="/app" class="nav-cta">Try Weave free →</a>
+
+  <button class="nav-hamburger" onclick="toggleMenu()" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#features" onclick="closeMenu()">Features</a>
+  <a href="#benefits" onclick="closeMenu()">Benefits</a>
+  <a href="#pricing" onclick="closeMenu()">Pricing</a>
+  <a href="#testimonials" onclick="closeMenu()">Blog</a>
+  <a href="#footer" onclick="closeMenu()">Contact</a>
+  <a href="/app" class="btn-primary" style="border-radius:100px;text-align:center;margin-top:8px;">Try Weave free</a>
+</div>
+
+<!-- ── HERO ── -->
+<section class="hero" id="home">
+  <div class="cloud cloud-left"></div>
+  <div class="cloud cloud-right"></div>
+
+  <div class="hero-badge">
+    <div class="hero-eyebrow">✦ &nbsp;The all-in-one work platform</div>
+  </div>
+  <h1 class="hero-h1">The only work tool your team needs.</h1>
+  <p class="hero-sub">The most complete work management platform ever built. Tasks, docs, chat, calendar, and more — all in one beautifully designed workspace.</p>
+
+  <div class="hero-ctas">
+    <a href="/app" class="btn-primary">Start with Weave</a>
+    <a href="#features" class="btn-secondary">See features</a>
+  </div>
+
+  <div class="hero-mock-wrap">
+    <div class="hero-mock-glow"></div>
+    <div class="hero-mock-fade"></div>
+    <div class="hero-mock-frame">
+      <div class="mock-browser-bar">
+        <div class="mock-dot" style="background:#FF5F57"></div>
+        <div class="mock-dot" style="background:#FFBD2E"></div>
+        <div class="mock-dot" style="background:#28CA41"></div>
+        <div class="mock-url-bar"></div>
+      </div>
+      <img src="/screenshots/dashboard.png" alt="Weave Dashboard" class="hero-screenshot" />
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ── FEATURE 1: PROJECT MANAGEMENT ── -->
+<section class="feature-section bg-white" id="features">
+  <div class="section-container">
+    <div class="feature-grid">
+      <div data-anim="slideInLeft" data-delay="0">
+        <div class="feature-label">Project Management</div>
+        <h2 class="feature-headline">Every project. Every deadline. Under control.</h2>
+        <p class="feature-body">Manage tasks with powerful views, custom properties, and smart assignments. Your team always knows what to do, who owns it, and when it's due.</p>
+        <a href="/app" class="feature-cta">Try Weave free</a>
+        <div class="feature-chips">
+          <span class="feature-chip">✓ Tasks</span>
+          <span class="feature-chip">✓ Kanban board</span>
+          <span class="feature-chip">✓ Gantt chart</span>
+          <span class="feature-chip">✓ Custom columns</span>
+        </div>
+      </div>
+      <div data-anim="slideInRight" data-delay="100">
+        <div class="screen-frame">
+          <div class="screen-frame-bar">
+            <div class="screen-dot" style="background:#FF5F57"></div>
+            <div class="screen-dot" style="background:#FFBD2E"></div>
+            <div class="screen-dot" style="background:#28CA41"></div>
+            <div class="screen-url-bar"></div>
+          </div>
+          <img src="/screenshots/project-list.png" alt="Project List View" class="screen-img" />
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ── FEATURE 2: PAGES & DOCS ── -->
+<section class="feature-section bg-cream" id="benefits">
+  <div class="section-container">
+    <div class="feature-grid reversed">
+      <div data-anim="slideInRight" data-delay="0">
+        <div class="feature-label">Pages &amp; Docs</div>
+        <h2 class="feature-headline">Your team's second brain.</h2>
+        <p class="feature-body">Create rich documents, wikis, and notes with a powerful block editor. Tables, checklists, files, links and more — organized exactly the way you think.</p>
+        <a href="/app" class="feature-cta">Explore pages</a>
+        <div class="feature-chips">
+          <span class="feature-chip">✓ Block editor</span>
+          <span class="feature-chip">✓ Templates</span>
+          <span class="feature-chip">✓ File attachments</span>
+          <span class="feature-chip">✓ Tables</span>
+        </div>
+      </div>
+      <div data-anim="slideInLeft" data-delay="100">
+        <div class="screen-frame">
+          <div class="screen-frame-bar">
+            <div class="screen-dot" style="background:#FF5F57"></div>
+            <div class="screen-dot" style="background:#FFBD2E"></div>
+            <div class="screen-dot" style="background:#28CA41"></div>
+            <div class="screen-url-bar"></div>
+          </div>
+          <img src="/screenshots/pages.png" alt="Pages and Docs" class="screen-img" />
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ── FEATURE 3: CHAT & CALENDAR ── -->
+<section class="feature-section bg-white">
+  <div class="section-container">
+    <div class="feature-grid">
+      <div data-anim="slideInLeft" data-delay="0">
+        <div class="feature-label">Chat &amp; Calendar</div>
+        <h2 class="feature-headline">Communicate and plan without leaving.</h2>
+        <p class="feature-body">Built-in team chat and a shared calendar keep everyone aligned. Schedule meetings, set events, and message your team — all inside your workspace.</p>
+        <a href="/app" class="feature-cta">See how it works</a>
+        <div class="feature-chips">
+          <span class="feature-chip">✓ Group chat</span>
+          <span class="feature-chip">✓ Direct messages</span>
+          <span class="feature-chip">✓ Calendar</span>
+          <span class="feature-chip">✓ Events</span>
+        </div>
+      </div>
+      <div data-anim="slideInRight" data-delay="100">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="screen-frame">
+            <div class="screen-frame-bar">
+              <div class="screen-dot" style="background:#FF5F57"></div>
+              <div class="screen-dot" style="background:#FFBD2E"></div>
+              <div class="screen-dot" style="background:#28CA41"></div>
+              <div class="screen-url-bar"></div>
+            </div>
+            <img src="/screenshots/chat.png" alt="Team Chat" class="screen-img" style="max-height:220px" />
+          </div>
+          <div class="screen-frame">
+            <div class="screen-frame-bar">
+              <div class="screen-dot" style="background:#FF5F57"></div>
+              <div class="screen-dot" style="background:#FFBD2E"></div>
+              <div class="screen-dot" style="background:#28CA41"></div>
+              <div class="screen-url-bar"></div>
+            </div>
+            <img src="/screenshots/calendar.png" alt="Calendar" class="screen-img" style="max-height:220px" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ── SCREENSHOT SHOWCASE ── -->
+<section class="showcase-section">
+  <div class="section-container">
+    <div data-anim="fadeUp" data-delay="0">
+      <div class="section-label">Everything in one place</div>
+      <div class="section-headline" style="font-size:40px;margin-bottom:0">See Weave in action</div>
+    </div>
+    <div class="showcase-grid">
+      <div class="showcase-item" data-anim="fadeUp" data-delay="0">
+        <div class="screen-frame">
+          <div class="screen-frame-bar">
+            <div class="screen-dot" style="background:#FF5F57"></div>
+            <div class="screen-dot" style="background:#FFBD2E"></div>
+            <div class="screen-dot" style="background:#28CA41"></div>
+            <div class="screen-url-bar"></div>
+          </div>
+          <img src="/screenshots/kanban.png" alt="Kanban Board" class="screen-img" />
+        </div>
+        <div class="showcase-label">Kanban Board</div>
+      </div>
+      <div class="showcase-item" data-anim="fadeUp" data-delay="100">
+        <div class="screen-frame">
+          <div class="screen-frame-bar">
+            <div class="screen-dot" style="background:#FF5F57"></div>
+            <div class="screen-dot" style="background:#FFBD2E"></div>
+            <div class="screen-dot" style="background:#28CA41"></div>
+            <div class="screen-url-bar"></div>
+          </div>
+          <img src="/screenshots/task-detail.png" alt="Task Details" class="screen-img" />
+        </div>
+        <div class="showcase-label">Task Details</div>
+      </div>
+      <div class="showcase-item" data-anim="fadeUp" data-delay="200">
+        <div class="screen-frame">
+          <div class="screen-frame-bar">
+            <div class="screen-dot" style="background:#FF5F57"></div>
+            <div class="screen-dot" style="background:#FFBD2E"></div>
+            <div class="screen-dot" style="background:#28CA41"></div>
+            <div class="screen-url-bar"></div>
+          </div>
+          <img src="/screenshots/gantt.png" alt="Gantt Chart" class="screen-img" />
+        </div>
+        <div class="showcase-label">Gantt Chart</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ── PRICING ── -->
+<section class="pricing" id="pricing">
+  <div class="section-container">
+
+    <!-- Split card -->
+    <div class="pricing-main-card" data-anim="fadeUp" data-delay="0">
+
+      <!-- Left: light -->
+      <div class="pcard-left">
+        <div>
+          <h3 class="pcard-left-heading">One off project</h3>
+          <p class="pcard-left-desc">Pay once and get full lifetime access to Weave. Ideal for teams, startups, and individuals who want powerful project management without recurring fees.</p>
+        </div>
+        <div class="pcard-bottom">
+          <div class="pcard-price-row">
+            <span class="pcard-price-amount">$79</span>
+            <span class="pcard-price-suffix">/ one-time payment</span>
+          </div>
+          <hr class="pcard-hr" />
+          <p class="pcard-footnote">Includes all future updates. No subscriptions. No per-user fees.</p>
+        </div>
+      </div>
+
+      <!-- Right: dark -->
+      <div class="pcard-right">
+        <div>
+          <p class="pcard-right-header">What's included:</p>
+          <ul class="pcard-features-list">
+            <li><span class="pplus">+</span> Unlimited projects &amp; workspaces</li>
+            <li><span class="pplus">+</span> All views — List, Board &amp; Gantt</li>
+            <li><span class="pplus">+</span> Custom columns &amp; properties</li>
+            <li><span class="pplus">+</span> Built-in chat &amp; team messaging</li>
+            <li><span class="pplus">+</span> Calendar &amp; timeline planning</li>
+            <li><span class="pplus">+</span> Voice notes &amp; file attachments</li>
+            <li><span class="pplus">+</span> Guest sharing &amp; client view</li>
+            <li><span class="pplus">+</span> All future updates included</li>
+          </ul>
+        </div>
+        <a href="/app" class="pcard-btn-get">Get started &rarr;</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ── FINAL CTA ── -->
+<section class="final-cta">
+  <div class="cloud cloud-left"></div>
+  <div class="cloud cloud-right"></div>
+  <div>
+    <h2 data-anim="fadeUp" data-delay="0">Your team deserves better tools.</h2>
+    <p data-anim="fadeUp" data-delay="150">Try free for 7 days — then $20 once, forever.</p>
+    <a href="/app" class="btn-primary" data-anim="fadeUp" data-delay="300">Start free trial</a>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ── FOOTER ── -->
+<footer id="footer">
+  <div class="footer-top" data-anim="fadeUp" data-delay="0">
+    <div class="footer-brand">
+      <div class="nav-logo">
+        <div class="nav-logo-mark">
+          <svg viewBox="0 0 44 36" width="36" height="29" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 4 28 Q 22 8 40 28" stroke="#2EC4B6" stroke-width="3" stroke-linecap="round" opacity="1"/>
+            <path d="M 8 22 Q 22 8 36 22" stroke="#2EC4B6" stroke-width="3" stroke-linecap="round" opacity="0.65"/>
+            <path d="M 12 16 Q 22 6 32 16" stroke="#2EC4B6" stroke-width="3" stroke-linecap="round" opacity="0.3"/>
+          </svg>
+        </div>
+        <span class="nav-wordmark">Weave</span>
+      </div>
+      <p class="footer-tagline">The last work tool your team will ever need.</p>
+    </div>
+    <div class="footer-links-row">
+      <div>
+        <div class="footer-col-title">Pages</div>
+        <div class="footer-col">
+          <a href="#home">Home</a>
+          <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#testimonials">Blog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-title">Information</div>
+        <div class="footer-col">
+          <a href="#footer">Contact</a>
+          <a href="#footer">Privacy</a>
+          <a href="#footer">Terms of use</a>
+          <a href="#footer">404</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Weave. All rights reserved.</span>
+    <span>Built with ♥ for productive teams</span>
+  </div>
+</footer>
+
+<script>
+  // ── Mobile menu ──
+  function toggleMenu() {
+    document.getElementById('mobileMenu').classList.toggle('open');
+  }
+  function closeMenu() {
+    document.getElementById('mobileMenu').classList.remove('open');
+  }
+
+  // ── Scroll animations via data-anim ──
+  const animEls = document.querySelectorAll('[data-anim]');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const el = entry.target;
+        const anim = el.dataset.anim;
+        const delay = el.dataset.delay || '0';
+        el.style.animationDelay = delay + 'ms';
+        el.style.animation = `${anim} 0.7s cubic-bezier(0.22,1,0.36,1) both`;
+        // Also animate feature chips inside the element
+        const chips = el.querySelectorAll('.feature-chip');
+        chips.forEach((chip, idx) => {
+          chip.style.opacity = '0';
+          chip.style.transform = 'translateY(8px)';
+          chip.style.transition = 'opacity 400ms ease-out, transform 400ms ease-out';
+          setTimeout(() => {
+            chip.style.opacity = '1';
+            chip.style.transform = 'translateY(0)';
+          }, parseInt(delay) + 200 + idx * 100);
+        });
+        io.unobserve(el);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  animEls.forEach(el => {
+    el.style.opacity = '0';
+    io.observe(el);
+  });
+
+
+  // ── Nav blur on scroll ──
+  const nav = document.querySelector('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('nav-scrolled', window.scrollY > 60);
+  }, { passive: true });
+
+  // ── Smooth anchor close mobile menu ──
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', closeMenu);
+  });
+</script>
+
+</body>
+</html>

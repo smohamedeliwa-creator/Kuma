@@ -32,7 +32,7 @@ function getContrastColor(hex) {
 
 // ─── Person helpers ────────────────────────────────────────────────────────────
 
-const PERSON_COLORS = ['#0066CC','#1A1A2E','#059669','#D97706','#DC2626','#0891B2','#3385D6','#EC4899'];
+const PERSON_COLORS = ['var(--brand-primary)','#1A1A2E','#059669','#D97706','#DC2626','#0891B2','#3385D6','#EC4899'];
 
 function getPersonColor(name) {
   let hash = 0;
@@ -80,7 +80,7 @@ function PersonField({ names, onChange }) {
   }
 
   return (
-    <div className="flex flex-wrap gap-1 rounded-md border bg-[hsl(var(--background))] p-1.5 min-h-[36px] focus-within:ring-2 focus-within:ring-[#0066CC]/30">
+    <div className="flex flex-wrap gap-1 rounded-md border bg-[hsl(var(--background))] p-1.5 min-h-[36px] focus-within:ring-2 focus-within:ring-[var(--brand-primary)]/30">
       {names.map((name, i) => (
         <PersonTag key={i} name={name} onRemove={() => {
           const next = names.filter((_, j) => j !== i);
@@ -139,7 +139,7 @@ function ChecklistField({ items, onChange }) {
               type="button"
               onClick={() => toggleItem(idx)}
               className={`h-4 w-4 shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
-                item.checked ? 'bg-[#0066CC] border-[#0066CC]' : 'border-[hsl(var(--muted-foreground))] bg-transparent'
+                item.checked ? 'bg-[var(--brand-primary)] border-[var(--brand-primary)]' : 'border-[hsl(var(--muted-foreground))] bg-transparent'
               }`}
             >
               {item.checked && <Check className="h-2.5 w-2.5 text-white" />}
@@ -168,7 +168,7 @@ function ChecklistField({ items, onChange }) {
           className="flex-1 bg-transparent text-sm text-[hsl(var(--muted-foreground))] outline-none placeholder:text-[hsl(var(--muted-foreground))]"
         />
         {newText.trim() && (
-          <button type="button" onClick={addItem} className="text-[#0066CC] text-sm font-medium">Add</button>
+          <button type="button" onClick={addItem} className="text-[var(--brand-primary)] text-sm font-medium">Add</button>
         )}
       </div>
     </div>
@@ -213,7 +213,7 @@ export function ColumnCellValue({ column, value, members = [] }) {
       return (
         <div className="flex items-center gap-1.5 min-w-[60px]">
           <div className="flex-1 h-1.5 rounded-full bg-[hsl(var(--muted))] overflow-hidden">
-            <div className="h-full rounded-full bg-[#0066CC] transition-all" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full bg-[var(--brand-primary)] transition-all" style={{ width: `${pct}%` }} />
           </div>
           <span className="text-[10px] text-[hsl(var(--muted-foreground))] whitespace-nowrap">{done}/{items.length}</span>
         </div>
@@ -235,33 +235,54 @@ export function ColumnCellValue({ column, value, members = [] }) {
     case 'multi_select': {
       const arr = Array.isArray(value) ? value : [];
       if (arr.length === 0) return <span className="text-[hsl(var(--muted-foreground))] text-xs">—</span>;
+      const MAX = 2;
+      const visible = arr.slice(0, MAX);
+      const overflow = arr.length - MAX;
       return (
-        <div className="flex flex-wrap gap-1">
-          {arr.map(v => {
+        <div className="flex items-center gap-1 flex-nowrap overflow-hidden">
+          {visible.map(v => {
             const opt = column.config?.options?.find(o => o.label === v);
             const bg = opt?.color || '#94a3b8';
             return (
               <span
                 key={v}
-                className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+                className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap flex-shrink-0"
                 style={{ backgroundColor: bg, color: getContrastColor(bg) }}
               >
                 {v}
               </span>
             );
           })}
+          {overflow > 0 && (
+            <span
+              className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap flex-shrink-0 bg-[var(--surface-secondary)] text-[var(--text-muted)]"
+              title={arr.slice(MAX).join(', ')}
+            >
+              +{overflow}
+            </span>
+          )}
         </div>
       );
     }
     case 'person': {
       const names = Array.isArray(value) ? value.filter(n => typeof n === 'string') : [];
       if (names.length === 0) return <span className="text-[hsl(var(--muted-foreground))] text-xs">—</span>;
+      const MAX = 2;
+      const visible = names.slice(0, MAX);
+      const overflow = names.length - MAX;
       return (
-        <div className="flex flex-wrap gap-1">
-          {names.slice(0, 3).map((name, i) => (
+        <div className="flex items-center gap-1 flex-nowrap overflow-hidden">
+          {visible.map((name, i) => (
             <PersonTag key={i} name={name} />
           ))}
-          {names.length > 3 && <span className="text-xs text-[hsl(var(--muted-foreground))]">+{names.length - 3}</span>}
+          {overflow > 0 && (
+            <span
+              className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap flex-shrink-0 bg-[var(--surface-secondary)] text-[var(--text-muted)]"
+              title={names.slice(MAX).join(', ')}
+            >
+              +{overflow}
+            </span>
+          )}
         </div>
       );
     }
@@ -271,7 +292,7 @@ export function ColumnCellValue({ column, value, members = [] }) {
           href={value}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[#0066CC] hover:underline text-xs truncate max-w-[100px] block"
+          className="text-[var(--brand-primary)] hover:underline text-xs truncate max-w-[100px] block"
           onClick={e => e.stopPropagation()}
         >
           {value}
@@ -329,7 +350,7 @@ export function ColumnField({ column, value, onChange, members = [], canEdit }) 
               href={value}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-[#0066CC] hover:underline flex items-center gap-1"
+              className="text-xs text-[var(--brand-primary)] hover:underline flex items-center gap-1"
             >
               <Link2 className="h-3 w-3" /> Open link
             </a>
@@ -618,7 +639,7 @@ export function ColumnSettingsDialog({ column, open, onOpenChange, onUpdated, on
                         className="h-6 w-6 cursor-pointer rounded border-0 bg-transparent p-0 shrink-0"
                       />
                       <input
-                        className="flex-1 h-7 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 text-sm outline-none focus:ring-2 focus:ring-[#0066CC]/30"
+                        className="flex-1 h-7 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/30"
                         value={opt.label}
                         onChange={e => setOptions(prev => prev.map((o, j) => j === i ? { ...o, label: e.target.value } : o))}
                       />
@@ -640,7 +661,7 @@ export function ColumnSettingsDialog({ column, open, onOpenChange, onUpdated, on
                     className="h-6 w-6 cursor-pointer rounded border-0 bg-transparent p-0 shrink-0"
                   />
                   <input
-                    className="flex-1 h-7 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 text-sm outline-none focus:ring-2 focus:ring-[#0066CC]/30"
+                    className="flex-1 h-7 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-2 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/30"
                     value={newOptLabel}
                     onChange={e => setNewOptLabel(e.target.value)}
                     placeholder="New option…"

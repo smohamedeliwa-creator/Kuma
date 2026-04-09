@@ -114,7 +114,7 @@ function PublicTaskView({ task, comments }) {
           <div className="space-y-3">
             {comments.map(c => (
               <div key={c.id} className="flex gap-3">
-                <div className="h-7 w-7 shrink-0 rounded-full bg-[#0066CC] flex items-center justify-center text-white text-xs font-bold">
+                <div className="h-7 w-7 shrink-0 rounded-full bg-[var(--brand-primary)] flex items-center justify-center text-white text-xs font-bold">
                   {(c.username || '?')[0].toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -153,7 +153,7 @@ function ErrorPage({ code }) {
       <p className="text-sm text-[hsl(var(--muted-foreground))] max-w-sm mb-6">{desc}</p>
       <Link
         to="/dashboard"
-        className="rounded-md bg-[#0066CC] px-4 py-2 text-sm font-medium text-white hover:bg-[#0052a3] transition-colors"
+        className="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[#0052a3] transition-colors"
       >
         Go to Kuma
       </Link>
@@ -196,7 +196,7 @@ export function ShareView() {
             </span>
             <Link
               to="/dashboard"
-              className="rounded-md bg-[#0066CC] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#0052a3] transition-colors"
+              className="rounded-md bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#0052a3] transition-colors"
             >
               Sign in to collaborate
             </Link>
@@ -208,7 +208,7 @@ export function ShareView() {
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         {loading ? (
           <div className="flex items-center justify-center py-24">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#0066CC] border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--brand-primary)] border-t-transparent" />
           </div>
         ) : error ? (
           <ErrorPage code={error} />
@@ -231,7 +231,7 @@ export function ShareView() {
             </div>
             <Link
               to="/dashboard"
-              className="shrink-0 rounded-md bg-[#0066CC] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0052a3] transition-colors"
+              className="shrink-0 rounded-md bg-[var(--brand-primary)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0052a3] transition-colors"
             >
               Get started free
             </Link>

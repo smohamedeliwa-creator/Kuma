@@ -19,7 +19,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
-import logo from '@/assets/logo.png';
+import { WeaveLogoCompact, WeaveLogoMark } from '@/components/WeaveLogo';
 import { NewPageModal } from '@/components/NewPageModal';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ function timeAgo(dateStr) {
 
 const NOTIF_COLORS = {
   assignment: 'bg-blue-500',
-  comment:    'bg-[#0066CC]',
+  comment:    'bg-[var(--brand-primary)]',
   status:     'bg-green-500',
 };
 const NOTIF_ICONS = {
@@ -70,21 +70,21 @@ function NavRow({ to, icon: Icon, label, collapsed, badge, onClick, exact }) {
   const base = `relative flex items-center gap-3 rounded-md text-sm font-medium transition-colors select-none h-10
     ${collapsed ? 'justify-center px-0 w-full' : 'px-4 w-full'}
     ${isActive
-      ? 'bg-[#E6F0FF] text-[#0066CC] dark:bg-[#0A1628] dark:text-[#0066CC] border-l-[3px] border-[#0066CC]'
-      : 'text-[#111111] dark:text-[#F5F5F5] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]'}
+      ? 'bg-[var(--brand-primary-light)] text-[var(--brand-primary)] dark:bg-[var(--brand-primary-light)] dark:text-[var(--brand-primary)] border-l-[3px] border-[var(--brand-primary)]'
+      : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'}
     ${isActive && !collapsed ? '-ml-px pl-[13px]' : ''}`;
 
   const inner = (
     <>
-      <Icon className={`h-5 w-5 shrink-0 ${isActive ? '' : 'text-[#6B7280] dark:text-[#9CA3AF]'}`} />
+      <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-[var(--brand-primary)]' : 'text-[var(--text-muted)]'}`} />
       {!collapsed && <span className="flex-1 truncate">{label}</span>}
       {badge > 0 && !collapsed && (
-        <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#0066CC] px-1 text-[10px] font-bold text-white">
+        <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--brand-primary)] px-1 text-[10px] font-bold text-white">
           {badge > 9 ? '9+' : badge}
         </span>
       )}
       {badge > 0 && collapsed && (
-        <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#0066CC]" />
+        <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[var(--brand-primary)]" />
       )}
     </>
   );
@@ -251,11 +251,11 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
     <>
       {/* Mobile hamburger (always visible on small screens) */}
       <button
-        className="fixed left-4 top-3.5 z-40 flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#E5E5E5] bg-white shadow-sm transition-colors hover:bg-[#F5F5F5] dark:border-[#2E2E2E] dark:bg-[#1A1A1A] dark:hover:bg-[#222222] lg:hidden"
+        className="fixed left-4 top-3.5 z-40 flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#E5E5E5] bg-white shadow-sm transition-colors hover:bg-[var(--surface-hover)] dark:border-[#2E2E2E] dark:bg-[#1A1A1A] dark:hover:bg-[#222222] lg:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label="Open navigation"
       >
-        <Menu className="h-4 w-4 text-[#111111] dark:text-[#F5F5F5]" />
+        <Menu className="h-4 w-4 text-[var(--text-primary)] dark:text-[var(--text-primary)]" />
       </button>
 
       {/* Mobile backdrop */}
@@ -279,22 +279,21 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
         ].join(' ')}
       >
         {/* ── Logo row ── */}
-        <div className={`flex h-14 shrink-0 items-center border-b border-[#E5E5E5] dark:border-[#1F1F1F] ${collapsed ? 'lg:justify-center' : 'justify-between px-4'}`}>
+        <div className={`flex h-14 shrink-0 items-center border-b border-[var(--border-color)] ${collapsed ? 'lg:justify-center' : 'justify-between px-4'}`}>
           <Link
             to="/dashboard"
             className="flex items-center gap-2 min-w-0"
             onClick={() => setMobileOpen(false)}
           >
-            <img src={logo} alt="Kuma" className="h-7 w-auto shrink-0" width="28" height="28" />
-            {!collapsed && (
-              <span className="truncate font-bold text-[#111111] dark:text-[#F5F5F5]">Kuma</span>
-            )}
-            {collapsed && <span className="truncate font-bold text-[#111111] dark:text-[#F5F5F5] lg:hidden">Kuma</span>}
+            {collapsed
+              ? <WeaveLogoMark size={28} />
+              : <WeaveLogoCompact size={28} />
+            }
           </Link>
           {/* Mobile X close button */}
           <button
             onClick={() => setMobileOpen(false)}
-            className="ml-1 shrink-0 rounded-md p-1.5 text-[#6B7280] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] transition-colors lg:hidden"
+            className="ml-1 shrink-0 rounded-md p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-hover)] transition-colors lg:hidden"
             aria-label="Close sidebar"
           >
             <X className="h-4 w-4" />
@@ -303,7 +302,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
           {!collapsed && (
             <button
               onClick={() => onCollapsedChange(true)}
-              className="ml-1 shrink-0 rounded-md p-1.5 text-[#6B7280] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] transition-colors hidden lg:flex"
+              className="ml-1 shrink-0 rounded-md p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-hover)] transition-colors hidden lg:flex"
               aria-label="Collapse sidebar"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -319,7 +318,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
             <Tip label="Expand sidebar" show>
               <button
                 onClick={() => onCollapsedChange(false)}
-                className="mb-1 hidden lg:flex w-full items-center justify-center rounded-md py-2 text-[#6B7280] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A] transition-colors"
+                className="mb-1 hidden lg:flex w-full items-center justify-center rounded-md py-2 text-[var(--text-muted)] hover:bg-[var(--surface-hover)] transition-colors"
                 aria-label="Expand sidebar"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -344,7 +343,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
               <Tip label="Notifications" show={collapsed}>
                 <button
                   className={`relative flex w-full items-center gap-3 rounded-md text-sm font-medium transition-colors h-10
-                    text-[#111111] dark:text-[#F5F5F5] hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]
+                    text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]
                     ${collapsed ? 'justify-center' : 'px-4'}`}
                 >
                   <Bell className="h-5 w-5 shrink-0" />
@@ -384,7 +383,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
                         if (n.link) navigate(n.link);
                         setNotifOpen(false);
                       }}
-                      className={`w-full px-4 py-3 text-left transition-colors hover:bg-[hsl(var(--muted))] ${!n.read ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''}`}
+                      className={`w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-hover)] ${!n.read ? 'bg-[var(--brand-primary-light)] dark:bg-[var(--brand-primary-light)]' : ''}`}
                     >
                       <div className="flex items-start gap-3">
                         <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white ${NOTIF_COLORS[n.type] || 'bg-gray-400'}`}>
@@ -395,7 +394,8 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
                           <p className="mt-0.5 line-clamp-2 text-xs text-[hsl(var(--muted-foreground))]">{n.message}</p>
                           <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{timeAgo(n.created_at)}</p>
                         </div>
-                        {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#0066CC]" />}
+                        {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--brand-primary)]" />}
+
                       </div>
                     </button>
                   </div>
@@ -404,7 +404,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
               <div className="border-t">
                 <button
                   onClick={() => { navigate('/notifications'); setNotifOpen(false); }}
-                  className="w-full py-2.5 text-center text-xs font-medium text-[#0066CC] hover:bg-[hsl(var(--muted))] transition-colors"
+                  className="w-full py-2.5 text-center text-xs font-medium text-[var(--brand-primary)] hover:bg-[var(--surface-hover)] transition-colors"
                 >
                   View all notifications
                 </button>
@@ -413,16 +413,16 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
           </Popover>
 
           {/* Divider */}
-          <div className="my-1 border-t border-[#E5E5E5] dark:border-[#1F1F1F]" />
+          <div className="my-1 border-t border-[var(--border-color)]" />
 
           {/* Projects header */}
           {!collapsed ? (
             <div className="flex items-center justify-between px-3 pb-1 pt-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF] dark:text-[#6B7280]">Projects</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF] dark:text-[var(--text-muted)]">Projects</span>
               {isAdmin && (
                 <button
                   onClick={() => setNewProjectOpen(true)}
-                  className="rounded p-0.5 text-[#9CA3AF] transition-colors hover:bg-[#F5F5F5] hover:text-[#111111] dark:hover:bg-[#1A1A1A] dark:hover:text-[#F5F5F5]"
+                  className="rounded p-0.5 text-[#9CA3AF] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] dark:hover:bg-[var(--surface-hover)] dark:hover:text-[#F5F5F5]"
                   aria-label="New project"
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -433,7 +433,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
             <Tip label="New project" show>
               <button
                 onClick={() => setNewProjectOpen(true)}
-                className="flex w-full items-center justify-center rounded-md py-2 text-[#6B7280] transition-colors hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]"
+                className="flex w-full items-center justify-center rounded-md py-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)]"
                 aria-label="New project"
               >
                 <Plus className="h-4 w-4" />
@@ -456,8 +456,8 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
                         'flex w-full items-center rounded-md text-sm font-medium transition-colors',
                         collapsed ? 'justify-center py-2' : 'py-1.5 pl-1 pr-2 gap-1',
                         isActiveProject
-                          ? 'border-l-[3px] border-[#0066CC] bg-[#E6F0FF] text-[#0066CC] dark:bg-[#0A1628] dark:text-[#0066CC]'
-                          : 'text-[#111111] hover:bg-[#F5F5F5] dark:text-[#F5F5F5] dark:hover:bg-[#1A1A1A]',
+                          ? 'border-l-[3px] border-[var(--brand-primary)] bg-[var(--brand-primary-light)] text-[var(--brand-primary)] dark:bg-[var(--brand-primary-light)] dark:text-[var(--brand-primary)]'
+                          : 'text-[var(--text-primary)] hover:bg-[var(--surface-hover)] dark:text-[var(--text-primary)] dark:hover:bg-[var(--surface-hover)]',
                         isActiveProject && !collapsed ? '-ml-px' : '',
                       ].join(' ')}
                     >
@@ -493,7 +493,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
                           key={list.id}
                           to={`/projects/${project.id}`}
                           onClick={() => setMobileOpen(false)}
-                          className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-[#6B7280] transition-colors hover:bg-[#F5F5F5] hover:text-[#111111] dark:text-[#9CA3AF] dark:hover:bg-[#1A1A1A] dark:hover:text-[#F5F5F5]"
+                          className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] dark:text-[#9CA3AF] dark:hover:bg-[var(--surface-hover)] dark:hover:text-[#F5F5F5]"
                         >
                           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#D1D5DB] dark:bg-[#4B5563]" />
                           <span className="truncate">{list.name}</span>
@@ -507,20 +507,20 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
           </div>
 
           {/* Divider + Pages section */}
-          <div className="my-1 border-t border-[#E5E5E5] dark:border-[#1F1F1F]" />
+          <div className="my-1 border-t border-[var(--border-color)]" />
 
           {!collapsed ? (
             <div className="flex items-center justify-between px-3 pb-1 pt-2">
               <button
                 onClick={() => setPagesExpanded(v => !v)}
-                className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF] dark:text-[#6B7280] hover:text-[#111111] dark:hover:text-[#F5F5F5] transition-colors"
+                className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF] dark:text-[var(--text-muted)] hover:text-[var(--text-primary)] dark:hover:text-[#F5F5F5] transition-colors"
               >
                 <ChevronRight className={`h-3 w-3 transition-transform duration-150 ${pagesExpanded ? 'rotate-90' : ''}`} />
                 Pages
               </button>
               <button
                 onClick={() => handleCreatePage()}
-                className="rounded p-0.5 text-[#9CA3AF] transition-colors hover:bg-[#F5F5F5] hover:text-[#111111] dark:hover:bg-[#1A1A1A] dark:hover:text-[#F5F5F5]"
+                className="rounded p-0.5 text-[#9CA3AF] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] dark:hover:bg-[var(--surface-hover)] dark:hover:text-[#F5F5F5]"
                 aria-label="New page"
                 title="New page"
               >
@@ -531,7 +531,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
             <Tip label="New page" show>
               <button
                 onClick={() => handleCreatePage()}
-                className="flex w-full items-center justify-center rounded-md py-2 text-[#6B7280] transition-colors hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]"
+                className="flex w-full items-center justify-center rounded-md py-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)]"
                 aria-label="New page"
               >
                 <FileText className="h-4 w-4" />
@@ -551,8 +551,8 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
                     <div className={[
                       'flex w-full items-center rounded-md text-sm font-medium transition-colors py-1 pl-1 pr-1 gap-0.5',
                       isActive
-                        ? 'border-l-[3px] border-[#0066CC] bg-[#E6F0FF] text-[#0066CC] dark:bg-[#0A1628] dark:text-[#0066CC] -ml-px'
-                        : 'text-[#111111] hover:bg-[#F5F5F5] dark:text-[#F5F5F5] dark:hover:bg-[#1A1A1A]',
+                        ? 'border-l-[3px] border-[var(--brand-primary)] bg-[var(--brand-primary-light)] text-[var(--brand-primary)] dark:bg-[var(--brand-primary-light)] dark:text-[var(--brand-primary)] -ml-px'
+                        : 'text-[var(--text-primary)] hover:bg-[var(--surface-hover)] dark:text-[var(--text-primary)] dark:hover:bg-[var(--surface-hover)]',
                     ].join(' ')}>
                       {/* Sub-page toggle */}
                       <button
@@ -576,7 +576,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
                       </Link>
                       <button
                         onClick={() => handleCreatePage(page.id)}
-                        className="shrink-0 rounded p-0.5 opacity-0 hover:opacity-100 group-hover:opacity-100 text-[#9CA3AF] hover:bg-[#F5F5F5] hover:text-[#111111] dark:hover:bg-[#1A1A1A] dark:hover:text-[#F5F5F5] transition-all"
+                        className="shrink-0 rounded p-0.5 opacity-0 hover:opacity-100 group-hover:opacity-100 text-[#9CA3AF] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] dark:hover:bg-[var(--surface-hover)] dark:hover:text-[#F5F5F5] transition-all"
                         title="Add sub-page"
                       >
                         <Plus className="h-3 w-3" />
@@ -593,8 +593,8 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
                             className={[
                               'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
                               pathname === `/pages/${child.id}`
-                                ? 'text-[#0066CC] bg-[#E6F0FF] dark:bg-[#0A1628]'
-                                : 'text-[#6B7280] hover:bg-[#F5F5F5] hover:text-[#111111] dark:text-[#9CA3AF] dark:hover:bg-[#1A1A1A]',
+                                ? 'text-[var(--brand-primary)] bg-[var(--brand-primary-light)] dark:bg-[var(--brand-primary-light)]'
+                                : 'text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] dark:text-[#9CA3AF] dark:hover:bg-[var(--surface-hover)]',
                             ].join(' ')}
                           >
                             <span className="text-xs shrink-0">{child.icon || '📄'}</span>
@@ -609,7 +609,7 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
               {pages.filter(p => !p.parent_id).length === 0 && (
                 <button
                   onClick={() => handleCreatePage()}
-                  className="w-full rounded-md px-3 py-1.5 text-left text-xs text-[#9CA3AF] hover:bg-[#F5F5F5] hover:text-[#111111] dark:hover:bg-[#1A1A1A] transition-colors"
+                  className="w-full rounded-md px-3 py-1.5 text-left text-xs text-[#9CA3AF] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] dark:hover:bg-[var(--surface-hover)] transition-colors"
                 >
                   + New page
                 </button>
@@ -620,34 +620,34 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
           {/* Divider + Admin */}
           {isAdmin && (
             <>
-              <div className="my-1 border-t border-[#E5E5E5] dark:border-[#1F1F1F]" />
+              <div className="my-1 border-t border-[var(--border-color)]" />
               <NavRow to="/admin" icon={Shield} label="Admin Panel" collapsed={collapsed} />
             </>
           )}
         </nav>
 
         {/* ── Bottom user section ── */}
-        <div className="shrink-0 border-t border-[#E5E5E5] dark:border-[#1F1F1F] p-2 space-y-0.5">
+        <div className="shrink-0 border-t border-[var(--border-color)] p-2 space-y-0.5">
           {/* User row */}
           {!collapsed ? (
             <Link
               to="/profile"
-              className="flex items-center gap-3 rounded-md px-4 h-10 transition-colors hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]"
+              className="flex items-center gap-3 rounded-md px-4 h-10 transition-colors hover:bg-[var(--surface-hover)]"
               onClick={() => setMobileOpen(false)}
             >
               <Avatar name={avatarName} color={avatarColor} size="sm" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-[#111111] dark:text-[#F5F5F5]">
+                <p className="truncate text-sm font-medium text-[var(--text-primary)] dark:text-[var(--text-primary)]">
                   {user?.full_name || user?.username}
                 </p>
-                <p className="text-xs capitalize text-[#6B7280] dark:text-[#9CA3AF]">{user?.role}</p>
+                <p className="text-xs capitalize text-[var(--text-muted)] dark:text-[#9CA3AF]">{user?.role}</p>
               </div>
             </Link>
           ) : (
             <Tip label={user?.username || 'Profile'} show>
               <Link
                 to="/profile"
-                className="flex w-full items-center justify-center rounded-md py-2 transition-colors hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]"
+                className="flex w-full items-center justify-center rounded-md py-2 transition-colors hover:bg-[var(--surface-hover)]"
                 onClick={() => setMobileOpen(false)}
               >
                 <Avatar name={avatarName} color={avatarColor} size="sm" />
@@ -659,17 +659,17 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
           {!collapsed ? (
             <button
               onClick={onToggleDark}
-              className="flex w-full items-center gap-3 rounded-md px-4 h-10 text-sm font-medium text-[#111111] dark:text-[#F5F5F5] transition-colors hover:bg-[#F5F5F5] dark:hover:bg-[#1A1A1A]"
+              className="flex w-full items-center gap-3 rounded-md px-4 h-10 text-sm font-medium text-[var(--text-primary)] dark:text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-hover)]"
               aria-label="Toggle theme"
             >
-              {darkMode ? <Sun className="h-5 w-5 shrink-0 text-[#6B7280] dark:text-[#9CA3AF]" /> : <Moon className="h-5 w-5 shrink-0 text-[#6B7280] dark:text-[#9CA3AF]" />}
+              {darkMode ? <Sun className="h-5 w-5 shrink-0 text-[var(--text-muted)] dark:text-[#9CA3AF]" /> : <Moon className="h-5 w-5 shrink-0 text-[var(--text-muted)] dark:text-[#9CA3AF]" />}
               <span>{darkMode ? 'Light mode' : 'Dark mode'}</span>
             </button>
           ) : (
             <Tip label={darkMode ? 'Light mode' : 'Dark mode'} show>
               <button
                 onClick={onToggleDark}
-                className="flex w-full items-center justify-center rounded-md py-2 text-[#6B7280] transition-colors hover:bg-[#F5F5F5] hover:text-[#111111] dark:hover:bg-[#1A1A1A] dark:hover:text-[#F5F5F5]"
+                className="flex w-full items-center justify-center rounded-md py-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] dark:hover:bg-[var(--surface-hover)] dark:hover:text-[#F5F5F5]"
                 aria-label="Toggle theme"
               >
                 {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -681,17 +681,17 @@ export function SideNav({ collapsed, onCollapsedChange, darkMode, onToggleDark, 
           {!collapsed ? (
             <button
               onClick={handleLogout}
-              className="flex w-full items-center gap-3 rounded-md px-4 h-10 text-sm font-medium text-[#111111] dark:text-[#F5F5F5] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20 dark:hover:text-red-400"
+              className="flex w-full items-center gap-3 rounded-md px-4 h-10 text-sm font-medium text-[var(--text-primary)] dark:text-[var(--text-primary)] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20 dark:hover:text-red-400"
               aria-label="Logout"
             >
-              <LogOut className="h-5 w-5 shrink-0 text-[#6B7280] dark:text-[#9CA3AF]" />
+              <LogOut className="h-5 w-5 shrink-0 text-[var(--text-muted)] dark:text-[#9CA3AF]" />
               <span>Logout</span>
             </button>
           ) : (
             <Tip label="Logout" show>
               <button
                 onClick={handleLogout}
-                className="flex w-full items-center justify-center rounded-md py-2 text-[#6B7280] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20 dark:hover:text-red-400"
+                className="flex w-full items-center justify-center rounded-md py-2 text-[var(--text-muted)] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20 dark:hover:text-red-400"
                 aria-label="Logout"
               >
                 <LogOut className="h-4 w-4" />

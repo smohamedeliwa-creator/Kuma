@@ -503,10 +503,10 @@ export function ChatPanel({ open, onClose, onUnreadChange }) {
         {/* ── Panel Header ──────────────────────────────────────────────── */}
         <div className="flex h-14 shrink-0 items-center justify-between border-b px-4">
           <div className="flex items-center gap-2">
-            <MessageSquareText className="h-5 w-5 text-[#0066CC]" />
+            <MessageSquareText className="h-5 w-5 text-[var(--brand-primary)]" />
             <h2 className="font-semibold">Messages</h2>
             {totalUnread > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0066CC] text-[10px] font-bold text-white px-1">
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--brand-primary)] text-[10px] font-bold text-white px-1">
                 {totalUnread > 99 ? '99+' : totalUnread}
               </span>
             )}
@@ -588,7 +588,7 @@ export function ChatPanel({ open, onClose, onUnreadChange }) {
                           size="sm"
                         />
                       ) : (
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0066CC]/10 text-[#0066CC]">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]">
                           <Users className="h-3.5 w-3.5" />
                         </div>
                       )}
@@ -606,7 +606,7 @@ export function ChatPanel({ open, onClose, onUnreadChange }) {
                             {lastMsgPreview(conv)}
                           </p>
                           {hasUnread && (
-                            <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-[#0066CC] text-[10px] font-bold text-white px-1">
+                            <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-[var(--brand-primary)] text-[10px] font-bold text-white px-1">
                               {conv.unread_count}
                             </span>
                           )}
@@ -654,7 +654,7 @@ export function ChatPanel({ open, onClose, onUnreadChange }) {
                             size="sm"
                           />
                         ) : (
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0066CC]/10 text-[#0066CC]">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]">
                             <Users className="h-3.5 w-3.5" />
                           </div>
                         )}
@@ -751,7 +751,7 @@ export function ChatPanel({ open, onClose, onUnreadChange }) {
                               <div
                                 className={`relative rounded-2xl px-3 py-2 text-sm ${
                                   isOwn
-                                    ? 'bg-[#0066CC] text-white rounded-br-sm'
+                                    ? 'bg-[var(--brand-primary)] text-white rounded-br-sm'
                                     : 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] rounded-bl-sm'
                                 } ${isDeleted ? 'opacity-60' : ''}`}
                               >
@@ -969,13 +969,13 @@ export function ChatPanel({ open, onClose, onUnreadChange }) {
                       <button
                         key={u.id}
                         onClick={() => toggleUserInGroup(u.id)}
-                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${checked ? 'bg-[#0066CC]/10' : 'hover:bg-[hsl(var(--muted))]'}`}
+                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${checked ? 'bg-[var(--brand-primary)]/10' : 'hover:bg-[hsl(var(--muted))]'}`}
                       >
                         <Avatar name={u.full_name || u.username} color={u.avatar_color || getAvatarColor(u.username)} size="sm" />
                         <div className="flex-1">
                           <p className="text-sm font-medium">{u.full_name || u.username}</p>
                         </div>
-                        {checked && <div className="h-4 w-4 rounded-full bg-[#0066CC] flex items-center justify-center shrink-0"><div className="h-1.5 w-1.5 rounded-full bg-white" /></div>}
+                        {checked && <div className="h-4 w-4 rounded-full bg-[var(--brand-primary)] flex items-center justify-center shrink-0"><div className="h-1.5 w-1.5 rounded-full bg-white" /></div>}
                       </button>
                     );
                   })}

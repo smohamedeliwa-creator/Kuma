@@ -87,7 +87,7 @@ export function InviteAccept() {
 
         {status === 'loading' && (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-[#0066CC]" />
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--brand-primary)]" />
           </div>
         )}
 
@@ -180,7 +180,7 @@ export function InviteAccept() {
               </form>
               <p className="mt-4 text-center text-xs text-[hsl(var(--muted-foreground))]">
                 Already have an account?{' '}
-                <Link to="/login" className="text-[#0066CC] hover:underline">Log in</Link>
+                <Link to="/login" className="text-[var(--brand-primary)] hover:underline">Log in</Link>
               </p>
             </CardContent>
           </Card>

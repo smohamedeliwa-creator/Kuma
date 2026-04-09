@@ -16,7 +16,7 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
-const PRESET_COLORS = ['#0066CC', '#1A1A2E', '#059669', '#DC2626', '#D97706', '#0891B2'];
+const PRESET_COLORS = ['var(--brand-primary)', '#1A1A2E', '#059669', '#DC2626', '#D97706', '#0891B2'];
 const TYPE_LABELS = { event: 'Event', meeting: 'Meeting', deadline: 'Deadline' };
 const TYPE_BADGE_COLORS = {
   event: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
@@ -292,7 +292,7 @@ function EventFormModal({ open, onClose, onSave, editingEvent, allUsers, project
             <input
               id="ev-title"
               required
-              className="w-full rounded-md border bg-[hsl(var(--background))] px-3 h-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#0066CC]"
+              className="w-full rounded-md border bg-[hsl(var(--background))] px-3 h-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
               value={form.title}
               onChange={e => set('title', e.target.value)}
               placeholder="Event title"
@@ -311,7 +311,7 @@ function EventFormModal({ open, onClose, onSave, editingEvent, allUsers, project
                   onClick={() => set('type', t)}
                   className={`flex-1 rounded-md border py-2 text-sm font-medium capitalize transition-colors ${
                     form.type === t
-                      ? 'border-[#0066CC] bg-[#0066CC]/10 text-[#0066CC]'
+                      ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]'
                       : 'hover:bg-[hsl(var(--muted))]'
                   }`}
                 >
@@ -329,7 +329,7 @@ function EventFormModal({ open, onClose, onSave, editingEvent, allUsers, project
                 id="ev-start"
                 type="datetime-local"
                 required
-                className="w-full rounded-md border bg-[hsl(var(--background))] px-3 h-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#0066CC]"
+                className="w-full rounded-md border bg-[hsl(var(--background))] px-3 h-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
                 value={form.start_datetime}
                 onChange={e => set('start_datetime', e.target.value)}
               />
@@ -340,7 +340,7 @@ function EventFormModal({ open, onClose, onSave, editingEvent, allUsers, project
                 id="ev-end"
                 type="datetime-local"
                 required
-                className="w-full rounded-md border bg-[hsl(var(--background))] px-3 h-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#0066CC]"
+                className="w-full rounded-md border bg-[hsl(var(--background))] px-3 h-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
                 value={form.end_datetime}
                 onChange={e => set('end_datetime', e.target.value)}
               />
@@ -353,7 +353,7 @@ function EventFormModal({ open, onClose, onSave, editingEvent, allUsers, project
             <textarea
               id="ev-desc"
               rows={3}
-              className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0066CC] resize-none"
+              className="w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] resize-none"
               value={form.description}
               onChange={e => set('description', e.target.value)}
               placeholder="Optional description"
@@ -383,7 +383,7 @@ function EventFormModal({ open, onClose, onSave, editingEvent, allUsers, project
               <label className="block text-sm font-medium mb-1" htmlFor="ev-project">Link to project</label>
               <select
                 id="ev-project"
-                className="w-full rounded-md border bg-[hsl(var(--background))] px-3 h-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#0066CC]"
+                className="w-full rounded-md border bg-[hsl(var(--background))] px-3 h-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
                 value={form.project_id}
                 onChange={e => set('project_id', e.target.value)}
               >
@@ -468,14 +468,14 @@ function MonthView({ year, month, events, selectedDate, onSelectDate, onEventCli
             <div
               key={day}
               className={`min-h-[80px] sm:min-h-[110px] border-b border-r p-1 cursor-pointer transition-colors
-                ${today ? 'bg-[#0066CC]/5' : ''}
-                ${selected ? 'bg-[#0066CC]/10 ring-1 ring-inset ring-[#0066CC]/30' : ''}
+                ${today ? 'bg-[var(--brand-primary)]/5' : ''}
+                ${selected ? 'bg-[var(--brand-primary)]/10 ring-1 ring-inset ring-[var(--brand-primary)]/30' : ''}
                 hover:bg-[hsl(var(--muted))]/40`}
               onClick={() => onSelectDate(new Date(year, month, day))}
             >
               {/* Day number */}
               <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium mb-1
-                ${today ? 'bg-[#0066CC] text-white' : ''}`}>
+                ${today ? 'bg-[var(--brand-primary)] text-white' : ''}`}>
                 {day}
               </div>
 
@@ -533,7 +533,7 @@ function WeekView({ year, month, day, events, onEventClick }) {
           <div key={d.toISOString()} className="py-2 text-center">
             <div className="text-xs text-[hsl(var(--muted-foreground))]">{WEEK_DAYS[d.getDay()]}</div>
             <div className={`mx-auto mt-1 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold
-              ${isToday(d.getFullYear(), d.getMonth(), d.getDate()) ? 'bg-[#0066CC] text-white' : ''}`}>
+              ${isToday(d.getFullYear(), d.getMonth(), d.getDate()) ? 'bg-[var(--brand-primary)] text-white' : ''}`}>
               {d.getDate()}
             </div>
           </div>
@@ -816,7 +816,7 @@ export function Calendar() {
                 key={v}
                 onClick={() => setViewMode(v)}
                 className={`px-3 py-1.5 text-xs font-medium capitalize transition-colors
-                  ${viewMode === v ? 'bg-[#0066CC] text-white' : 'hover:bg-[hsl(var(--muted))]'}`}
+                  ${viewMode === v ? 'bg-[var(--brand-primary)] text-white' : 'hover:bg-[hsl(var(--muted))]'}`}
               >
                 {v}
               </button>
@@ -827,7 +827,7 @@ export function Calendar() {
         {/* Loading skeleton */}
         {loadingEvents ? (
           <div className="flex-1 flex items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#0066CC] border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--brand-primary)] border-t-transparent" />
           </div>
         ) : (
           <>
